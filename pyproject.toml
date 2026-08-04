@@ -1,0 +1,19 @@
+[project]
+name = "fiddlesticks"
+description = "Password recovery tool for encrypted archives (currently only .7z files supported)."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "James Parrott", email = "james@jamesparrott.dev" }
+]
+requires-python = ">=3.12"
+dependencies = []
+dynamic=["version"]
+
+[project.scripts]
+fiddlesticks = "fiddlesticks:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
