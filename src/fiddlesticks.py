@@ -8,11 +8,13 @@ __version__ == "0.0.0"
 import argparse
 import collections
 import functools
+import getpass
 import io
 import itertools
 from pathlib import Path
 from typing import Iterator, Iterable, Collection
 from types import MappingProxyType
+import warnings
 
 
 LEET_SPEAK = MappingProxyType({
@@ -96,7 +98,9 @@ def candidate_passwords_from_substitutions(
                 yield ''.join(candidate_password)
 
 
-def make_7z_file_password_checker(archive: str = "test_py7zr.7z"):
+
+
+def make_py7zr_file_password_checker(archive: str = "test_py7zr.7z"):
     import py7zr
     stream = io.BytesIO(Path(archive).read_bytes())
     def is_correct_password_for_7z_file(password: str, ) -> bool:
@@ -111,52 +115,83 @@ def make_7z_file_password_checker(archive: str = "test_py7zr.7z"):
         return True
     return is_correct_password_for_7z_file
 
+def make_subprocess_checker(command: str):
+    def is_correct_password(password: str) -> bool:
+        result = subprocess.run(f"{command}{password}")
+        return result.returncode==0
+    return is_correct_password
 
 def test_passwords(
-    candidates: candidates[str],
+    candidates: Iterable[str],
     test_func: Callable[[str], bool],
     verbosity: int = 0,
     update_every: int = 1,
-) -> tuple[tuple[str, int] | None, int]:
+    out_of_total: str = "",
+) -> tuple[str, int] | None:
     
-    N = len(candidates)
     for i, candidate in enumerate(candidates, start=1):
         if test_func(candidate):
-            return (candidate, i), N
+            return candidate, i
+
         if i % update_every:
             continue
         if verbosity == 0:
             print(".", end="", flush=True)
         elif verbosity >= 2:
-            print(f"{i}/{N}) tried: {candidate}", flush=True)
+            print(f"{i}{out_of_total}) tried: {candidate}", flush=True)
         else:
-            print(f"{i}/{N}", flush=True)
-    return None, N
-    
+            print(f"{i}{out_of_total}", flush=True)
 
-def search_for_passwords_from_guesses(
-    guesses: Iterable[str],
-    candidates_gen: Callable[[str], Iterator[str]],
-    ) -> tuple[tuple[str, int] | None, int]:
-    candidates = {
-        candidate
-        for guess in guesses
-        for candidate in candidates_gen(guess)
-    }
-    return test_passwords(
-        candidates,
-        functools.partial(candidate_passwords_from_substitutions, max_subs=2),
-        make_7z_file_password_checker(),
+    return None
+
+
+def default(
+    shell_command: str,
+    password_guess: str,
+    max_subs: int = 2,
+) -> tuple[str, int] | None:
+
+    checker = make_subprocess_checker(shell_command)
+    candidates = candidate_passwords_from_substitutions([password_guess], max_subs)
+    return test_passwords(candidates, checker)
+
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--max-subs", type=int, default=2)
+parser.add_argument("--password-guess", type=str, default="")
+parser.add_argument("shell_command", type=str, default="7z x archive.7z -p")
+commands_group = parser.add_mutually_exclusive_group(required=False)
+
+parser.set_defaults(command=default)
+
+def add_command_arg(name, command, help: str | None = None):
+    commands_group.add_argument(
+        name,
+        dest="command",
+        action="store_const",
+        const=command,
+        help=help,
     )
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser()
-
 
     namespace = parser.parse_args()
 
-    result = 
+    if namespace.password_guess:
+        warnings.warn(
+            "Password guess given on command line may be stored in history. "
+            "After this program ends, to delete the entry, e.g.: "
+            "history -d $(history 1 | awk '{print $1}')"
+        )
+    
+    kwargs = vars(namespace)
+    
+    if not namespace.password_guess is None:
+        kwargs["password_guess"] = getpass.getpass("Input password guess: ")
+
+    result = ns.command(**kwargs)
 
     if result is None:
         print(f"\n\nCould not find password after {N} attempts.  Try increasing search bounds, or another guess? ")
