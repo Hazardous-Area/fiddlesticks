@@ -9,10 +9,11 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = []
+optional_dependencies = []
 dynamic=["version"]
 
 [project.scripts]
-fiddlesticks = "fiddlesticks:main"
+fiddlesticks = "fiddlesticks:cli"
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
