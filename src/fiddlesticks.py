@@ -7,6 +7,7 @@
 __version__ = "0.0.0"
 
 import argparse
+import atexit
 import collections
 import functools
 import getpass
@@ -17,6 +18,8 @@ import string
 import subprocess
 import sys
 import tempfile
+import textwrap
+import time
 from typing import Iterator, Iterable, Collection, Hashable, Callable
 import warnings
 
@@ -137,17 +140,19 @@ def candidate_passwords_from_alt_chars(
     return total_num_candidates, generator()
 
 
-def make_py7zr_checker(archive: str, **kwargs):
+def make_py7zr_checker(archive: str, extract_to: str | None = None, **kwargs):
     import py7zr
+    if extract_to is None:
+        extract_to = str(_make_new_tmp_sub_dir(archive))
     stream = io.BytesIO(Path(archive).read_bytes())
-    def is_correct_password_for_7z_file(password: str, ) -> bool:
+    def is_correct_password_for_7z_file(candidate: str, ) -> bool:
         stream.seek(0)
         try:
-            f = py7zr.SevenZipFile(stream, 'r', password=password)
-            f.extractall(path="extracted")
-        except py7zr.exceptions.PasswordRequired:
+            f = py7zr.SevenZipFile(stream, 'r', password=candidate)
+            f.extractall(path=extract_to)
+        except (py7zr.exceptions.PasswordRequired, py7zr.exceptions.Bad7zFile):
             return False
-        finally:
+        else:
             f.close()
         return True
     return is_correct_password_for_7z_file
@@ -155,18 +160,19 @@ def make_py7zr_checker(archive: str, **kwargs):
 
 def make_subprocess_checker(*args: str, **kwargs):
     *rest, last = args
-    def is_correct_password(password: str) -> bool:
-        result = subprocess.run([*rest, f"{last}{password}"], capture_output=True)
+    def is_correct_password(candidate: str) -> bool:
+        result = subprocess.run([*rest, f"{last}{candidate}"], capture_output=True)
         return result.returncode==0
     return is_correct_password
 
-def _make_new_tmp_sub_dir() -> Path:
+def _make_new_tmp_sub_dir(file: str) -> Path:
     i = -1
     suffix = ""
     while (p := TMP_DIR / f"extracted{suffix}").is_dir():
         i += 1
         suffix = f"_{i}"
     p.mkdir()
+    print_to_stderr(f"If {file} is unzipped successfully, contents will be in: {p}")
     return p
 
 class ProgramNotFound(Exception): pass
@@ -178,9 +184,8 @@ def make_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
         raise ProgramNotFound(f"7zip.  Args: {args}")
 
     if extract_to is None:
-        extract_to = str(_make_new_tmp_sub_dir())
+        extract_to = str(_make_new_tmp_sub_dir(file))
 
-    print_to_stderr(f"Attempting to extract {file} to {extract_to} (using 7z). ")
     return make_subprocess_checker("7z","x", f"-o{extract_to}", file, "-p")
 
 def make_password_candidate_piper(**kwargs):
@@ -188,6 +193,49 @@ def make_password_candidate_piper(**kwargs):
         print(password, file=sys.stdout)
         return False
     return piper
+
+def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
+    if extract_to is None:
+        extract_to = str(_make_new_tmp_sub_dir(file))
+
+    cmd = textwrap.dedent(f"""\
+    while read -r line; do
+    
+    # Silently run command, only check exit code
+    7z x -o{extract_to} {file} -p"$line" > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        echo "Success! :)"
+        break
+    fi
+    echo "Nope :("
+    done
+    """)
+
+    # Launch a single persistent Bash process reading from stdin line-by-line
+    proc = subprocess.Popen(
+        ["bash", "-c", cmd],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True,
+        bufsize=1  # Line buffered
+    )
+
+    def checker(candidate: str) -> bool:
+        # Send data down the pipe
+        proc.stdin.write(f"{candidate}\n")
+        proc.stdin.flush()
+        
+        # Read the response back
+        response = proc.stdout.readline().strip()
+        return "Success" in response
+    
+    @atexit.register
+    def cleanup():
+        proc.stdin.close()
+        proc.wait()
+
+    return checker
+
 
 def test_passwords_sequentially(
     candidates: Iterable[str],
@@ -333,7 +381,7 @@ def add_mutex_group(
 
 checker_factories_group = add_mutex_group(
     "Password checker",
-    "The method (if any) used to test candidate passwords"
+    "The method (if any) used to test candidate passwords."
 )
 
 def add_checker_factory_arg(name, checker_factory, help: str | None = None):
@@ -345,6 +393,7 @@ def add_checker_factory_arg(name, checker_factory, help: str | None = None):
         help=help,
     )
 add_checker_factory_arg("--7zip", make_7zip_checker)
+add_checker_factory_arg("--7zip-persistent", make_persistent_7zip_checker)
 add_checker_factory_arg("--shell", make_subprocess_checker)
 add_checker_factory_arg("--py7zr", make_py7zr_checker)
 add_checker_factory_arg(
@@ -359,7 +408,7 @@ add_checker_factory_arg(
 alt_char_map_group = add_mutex_group(
     "Character map",
     ("The mapping for alternative characters, "
-    "to be used to generate candidate passwords from "
+    "to be used to generate candidate passwords from. "
     )
 )
 
@@ -376,7 +425,11 @@ add_alt_char_map_arg("--shift_and_leet", SHIFT_AND_LEET_BI_MAP)
 
 
 
-def cli() -> int:
+def cli(args: list[str] = sys.argv[1:]) -> int:
+
+    if not args:
+        parser.print_help()
+        return 0
 
     namespace = parser.parse_args()
 
@@ -391,14 +444,19 @@ def cli() -> int:
 
     output_file = kwargs.pop("output_file")
 
+    t0 = time.time()
+
     result = try_find_password_sequentially(**kwargs)
 
+    t1 = time.time()
+    
     if result is None:
         print_to_stderr(f"\n\nCould not find password. Try a different guess, or increasing max substitutions (-N) ? ")
         return 1
 
+
     password, i = result
-    msg = f"\n Found password (guess number: {i})"
+    msg = f"\n Found password (guess number: {i}) in {t1-t0} seconds"
     print_to_stderr(msg, end="")
 
     print_to_stderr(f" {password=}" if namespace.print_passwords else "")
