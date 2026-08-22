@@ -227,7 +227,7 @@ default_password_protected_file_checker_factories = {
 }
 
 
-def default_checker_factory(*args: str):
+def default_checker_factory(*args: str, **kwargs):
     if not args:
         raise ValueError(
             "Default checker requires arg(s) to define how to test the passwords"
