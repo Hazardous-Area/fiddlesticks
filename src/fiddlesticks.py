@@ -14,10 +14,15 @@ import io
 import itertools
 from pathlib import Path
 import string
+import subprocess
+import sys
+import tempfile
 from typing import Iterator, Iterable, Collection, Hashable, Callable
 import warnings
 
 
+TMP_DIR = Path(tempfile.gettempdir()) / "fiddlesticks"
+TMP_DIR.mkdir(exist_ok=True)
 
 SHIFT_MAP = {
     '1': '!',
@@ -61,6 +66,11 @@ LEET_SPEAK = {
 for c, v in list(LEET_SPEAK.items()):
     LEET_SPEAK[c.upper()] = v
 
+def print_to_stderr(*objects, file=sys.stderr, **kwargs):
+    """ Simple wrapper to print to stderr instead of stdout, 
+        for easy piping to stdout. 
+    """
+    print(*objects, file=file, **kwargs)
 
 def _calculate_total(lengths, M):
     # dp[j] = sum of products for choosing j items
@@ -87,17 +97,18 @@ def _combine_maps[T: Hashable](
     return bi_map
 
 
-BI_MAP = _combine_maps([SHIFT_MAP, LEET_SPEAK])
+SHIFT_AND_LEET_BI_MAP = _combine_maps([SHIFT_MAP, LEET_SPEAK])
 
 
 def candidate_passwords_from_alt_chars(
     guess: str,
     max_subs: int = 2,
     alt_chars: list[list[str]] | None = None,
+    alt_char_map: dict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
     ) -> tuple[int, Iterator[str]]:
     
 
-    alt_chars = alt_chars or [BI_MAP[c] for c in guess]
+    alt_chars = alt_chars or [alt_char_map[c] for c in guess]
     
     lengths = [len(chars) for chars in alt_chars] 
     total_num_candidates = sum(_calculate_total(lengths, M) for M in range(1, max_subs+1))
@@ -126,7 +137,7 @@ def candidate_passwords_from_alt_chars(
     return total_num_candidates, generator()
 
 
-def make_py7zr_file_password_checker(archive: str):
+def make_py7zr_checker(archive: str, **kwargs):
     import py7zr
     stream = io.BytesIO(Path(archive).read_bytes())
     def is_correct_password_for_7z_file(password: str, ) -> bool:
@@ -142,26 +153,58 @@ def make_py7zr_file_password_checker(archive: str):
     return is_correct_password_for_7z_file
 
 
-def make_subprocess_checker(*args: str):
-    
+def make_subprocess_checker(*args: str, **kwargs):
+    *rest, last = args
     def is_correct_password(password: str) -> bool:
-        result = subprocess.run(f"{command}{password}")
+        result = subprocess.run([*rest, f"{last}{password}"], capture_output=True)
         return result.returncode==0
     return is_correct_password
 
-def make_7zip_subprocess_checker(file: str):
-    return make_subprocess_checker(f"7z x {file} -p")
+def _make_new_tmp_sub_dir() -> Path:
+    i = -1
+    suffix = ""
+    while (p := TMP_DIR / f"extracted{suffix}").is_dir():
+        i += 1
+        suffix = f"_{i}"
+    p.mkdir()
+    return p
+
+class ProgramNotFound(Exception): pass
+
+def make_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
+    args = ["7z", "--help"]
+    result =subprocess.run(args, capture_output=True)
+    if result.returncode != 0:
+        raise ProgramNotFound(f"7zip.  Args: {args}")
+
+    if extract_to is None:
+        extract_to = str(_make_new_tmp_sub_dir())
+
+    print_to_stderr(f"Attempting to extract {file} to {extract_to} (using 7z). ")
+    return make_subprocess_checker("7z","x", f"-o{extract_to}", file, "-p")
+
+def make_password_candidate_piper(**kwargs):
+    def piper(password: str):
+        print(password, file=sys.stdout)
+        return False
+    return piper
 
 def test_passwords_sequentially(
     candidates: Iterable[str],
     test_func: Callable[[str], bool],
     verbosity: int = 0,
-    update_every: int = 1,
+    update_every: int | None = None,
     total: int | None = None,
-    print_password_to_stdout: bool = False
+    print_passwords: bool = False,
+    **kwargs,
 ) -> tuple[str, int] | None:
     
     out_of_total = "" if total is None else f"/{total}"
+
+    if update_every is None:
+        update_every = max(1, total // 300)
+    if verbosity >= 1:
+        update_every = min(update_every, 1000)
 
     for i, candidate in enumerate(candidates, start=1):
         if test_func(candidate):
@@ -170,17 +213,17 @@ def test_passwords_sequentially(
         if i % update_every:
             continue
         if verbosity == 0:
-            print(".", end="", flush=True)
+            print_to_stderr(".", end="", flush=True)
         elif verbosity >= 2 and print_passwords:
-            print(f"{i}{out_of_total}) tried: {candidate}", flush=True)
+            print_to_stderr(f"{i}{out_of_total}) tried: {candidate}", flush=True)
         else:
-            print(f"{i}{out_of_total}", flush=True)
+            print_to_stderr(f"{i}{out_of_total}", flush=True)
 
     return None
 
 
 default_password_protected_file_checker_factories = {
-    ".7z" : make_7zip_subprocess_checker,
+    ".7z" : make_7zip_checker,
 }
 
 
@@ -200,25 +243,66 @@ def default_checker_factory(*args: str):
 
 def try_find_password_sequentially(
     extras: list[str],
-    password_guess: str,
+    password_guess: str | None = None,
     max_subs: int = 2,
     checker_factory: Callable[[str], Callable[[str], bool]] = make_subprocess_checker,
+    extract_to: str | None = None,
     password_generator: Callable[[str, int], tuple[int | None, Iterator[str]]] = candidate_passwords_from_alt_chars,
+    alt_char_map: dict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
     **kwargs,
 ) -> tuple[str, int] | None:
 
-    checker = checker_factory(*args)
-    total, candidates = password_generator(password_guess, max_subs)
+    checker = checker_factory(*extras, extract_to=extract_to)
+    if password_guess is None:
+        password_guess = getpass.getpass("Input password guess: ")
+    total, candidates = password_generator(guess=password_guess, max_subs=max_subs, alt_char_map=alt_char_map)
     return test_passwords_sequentially(candidates, checker, total=total, **kwargs)
 
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--max-subs", '-N', type=int, default=2)
-parser.add_argument("--password-guess", type=str, default="")
+parser.suggest_on_error = True
+parser.add_argument(
+    "--max-subs",
+    '-N',
+    type=int,
+    default=2,
+    help=("The maximum number of character substitutions "
+          "that will be applied to the guess"
+    ),
+)
 parser.add_argument('--verbosity', '-v', action='count', default=0)
-parser.add_argument('--output-file', '-o', type=str, default="")
-parser.add_argument('--print-password-to-stdout', '-p', action="store_true")
+parser.add_argument(
+    '--output-file',
+    '-o',
+    type=str,
+    default="",
+    help="File to write found passwords to.",
+)
+parser.add_argument(
+    '--print-passwords',
+    '-P',
+    action="store_true",
+    help=("Set this option to print passwords to stderr. "
+          "By default, neither found passwords (nor candidates if -vv) are printed. "
+          "E.g. if extracting a password-protected archive as a side-effect is sufficient "
+          "(and you intend to re-encrypt it with a different password anyway)."
+    ),
+)
+parser.add_argument("--password-guess", "-p", default=None, help=(
+    "WARNING! If given on the command line, its value may be saved by your shell "
+    "and e.g. appear in the Bash history file.  Otherwise, you will be prompted to "
+    " securely enter this before the search can begin. "
+    )
+)
+parser.add_argument(
+    "--extract-to",
+    "-x",
+    default=None,
+    help=("The dir to try to extract archives in "
+          "(if using an external program as the password checker)"
+         ),
+)  
 parser.add_argument(
     "extras",
     type=str,
@@ -235,10 +319,23 @@ parser.add_argument(
 parser.set_defaults(
     checker_factory=default_checker_factory,
     password_generator=candidate_passwords_from_alt_chars,
+    alt_char_map=SHIFT_AND_LEET_BI_MAP,
 )
 
+def add_mutex_group(
+    title: str | None = None,
+    description: str | None = None,
+    required: bool = False,
+    ):
+    arg_group = parser.add_argument_group(title=title, description=description)
+    mutex_arg_group = arg_group.add_mutually_exclusive_group(required=required)
+    return mutex_arg_group
 
-checker_factories_group = parser.add_mutually_exclusive_group(required=False)
+checker_factories_group = add_mutex_group(
+    "Password checker",
+    "The method (if any) used to test candidate passwords"
+)
+
 def add_checker_factory_arg(name, checker_factory, help: str | None = None):
     checker_factories_group.add_argument(
         name,
@@ -247,16 +344,34 @@ def add_checker_factory_arg(name, checker_factory, help: str | None = None):
         const=checker_factory,
         help=help,
     )
+add_checker_factory_arg("--7zip", make_7zip_checker)
+add_checker_factory_arg("--shell", make_subprocess_checker)
+add_checker_factory_arg("--py7zr", make_py7zr_checker)
+add_checker_factory_arg(
+    "--pipe",
+    make_password_candidate_piper,
+    help=("Print all password candidates to stdout, "
+          "e.g. to pipe them to an external password checking program. "
+          "Overrides --print-passwords. "     
+    ),
+)
 
-password_generators_group = parser.add_mutually_exclusive_group(required=False)
-def add_pwd_generator_arg(name, checker_factory, help: str | None = None):
-    password_generators_group.add_argument(
+alt_char_map_group = add_mutex_group(
+    "Character map",
+    ("The mapping for alternative characters, "
+    "to be used to generate candidate passwords from "
+    )
+)
+
+def add_alt_char_map_arg(name, alt_char_map, help: str | None = None):
+    alt_char_map_group.add_argument(
         name,
-        dest="password_generator",
+        dest="alt_char_map",
         action="store_const",
-        const=checker_factory,
+        const=alt_char_map,
         help=help,
     )
+add_alt_char_map_arg("--shift_and_leet", SHIFT_AND_LEET_BI_MAP) 
 
 
 
@@ -265,32 +380,32 @@ def cli() -> int:
 
     namespace = parser.parse_args()
 
-    if namespace.password_guess:
+    if namespace.password_guess is not None:
         warnings.warn(
             "Password guess given on command line may be stored in history. "
-            "After this program ends, to delete the entry, e.g.: "
-            "history -d $(history 1 | awk '{print $1}')"
+            "After this program ends, you may wish to delete the latest entry, "
+            "e.g. by running: history -d $(history 1 | awk '{print $1}')"
         )
     
     kwargs = vars(namespace).copy()
-    
-    if not namespace.password_guess:
-        kwargs["password_guess"] = getpass.getpass("Input password guess: ")
+
+    output_file = kwargs.pop("output_file")
 
     result = try_find_password_sequentially(**kwargs)
 
     if result is None:
-        print(f"\n\nCould not find password.  Try a different guess, or increasing max substitutions (-N) ? ")
+        print_to_stderr(f"\n\nCould not find password. Try a different guess, or increasing max substitutions (-N) ? ")
         return 1
 
     password, i = result
     msg = f"\n Found password (guess number: {i})"
-    print(msg, end="")
-    if namespace.print_password_to_stdout:
-        print(f" {password=}")
-    if namespace.output_file:
-        with open(namespace.output_file, "at") as f:
-            f.write(f"{msg}")
+    print_to_stderr(msg, end="")
+
+    print_to_stderr(f" {password=}" if namespace.print_passwords else "")
+
+    if output_file:
+        with open(output_file, "at") as f:
+            f.write(f"{msg}, {password=}")
     return 0
 
 if __name__ == '__main__':
