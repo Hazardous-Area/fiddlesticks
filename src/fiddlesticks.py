@@ -449,14 +449,14 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
     result = try_find_password_sequentially(**kwargs)
 
     t1 = time.time()
-    
+
     if result is None:
         print_to_stderr(f"\n\nCould not find password. Try a different guess, or increasing max substitutions (-N) ? ")
         return 1
 
 
     password, i = result
-    msg = f"\n Found password (guess number: {i}) in {t1-t0} seconds"
+    msg = f"\n Found password (guess number: {i}) in {t1-t0:.3f} seconds"
     print_to_stderr(msg, end="")
 
     print_to_stderr(f" {password=}" if namespace.print_passwords else "")
