@@ -236,6 +236,23 @@ def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwa
 
     return checker
 
+def make_py_avdu_aegis_checker(file: str, **kwargs):
+    from py_avdu.encrypted_classes import VaultEncrypted
+
+    vault_dict = json.loads(pathlib.Path(file).read_text())
+
+    encrypted = VaultEncrypted(**vault_dict)
+
+    def checker(candidate: str) -> bool:
+        try:
+            encrypted.find_master_key(candidate)
+            return True
+        except ValueError:
+            return False
+        
+
+    return checker
+
 
 def test_passwords_sequentially(
     candidates: Iterable[str],
@@ -396,6 +413,7 @@ add_checker_factory_arg("--7zip", make_7zip_checker)
 add_checker_factory_arg("--7zip-persistent", make_persistent_7zip_checker)
 add_checker_factory_arg("--shell", make_subprocess_checker)
 add_checker_factory_arg("--py7zr", make_py7zr_checker)
+add_checker_factory_arg("--aegis-pyavdu", make_py_avdu_aegis_checker)
 add_checker_factory_arg(
     "--pipe",
     make_password_candidate_piper,

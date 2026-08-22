@@ -9,7 +9,9 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = []
-optional_dependencies = []
+optional_dependencies = [
+    "py-avdu",
+]
 dynamic=["version"]
 
 [project.scripts]
