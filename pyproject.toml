@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "fiddlesticks"
 description = "Password recovery tool for encrypted archives (currently only .7z files supported)."
@@ -8,15 +12,32 @@ authors = [
     { name = "James Parrott", email = "james@jamesparrott.dev" }
 ]
 requires-python = ">=3.12"
-dependencies = []
-optional_dependencies = [
-    "py-avdu",
-]
 dynamic=["version"]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest", "hypothesis"]
+aegis = ["py-avdu",]
+py7zr = ["py7zr",]
+
+[project.urls]
+GitHub = "https://github.com/Hazardous-Area/fiddlesticks"
 
 [project.scripts]
 fiddlesticks = "fiddlesticks:cli"
 
-[build-system]
-requires = ["uv_build>=0.12.1,<0.13.0"]
-build-backend = "uv_build"
+[tool.hatch.build.targets.wheel]
+only-include = ["src"]
+sources = {"src" = ""}  # move from "src" directory for wheel
+
+[tool.hatch.version]
+path = "src/fiddlesticks.py" 
+
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks other tests that cause bottlenecks",
+    "hypothesis: tests that require hypothesis",
+]
+python_files = "test_*.py *_test.py *_tests.py"
+
