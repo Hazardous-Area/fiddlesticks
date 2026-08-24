@@ -61,7 +61,7 @@ for k in list(BI_MAP):
 
 def _get_num_subs(pwd: str) -> int:
     L = len(pwd)
-    return min(L, 3)
+    return min(L, 4)
 
 @pytest.mark.hypothesis
 @given(pwd=passwords)
