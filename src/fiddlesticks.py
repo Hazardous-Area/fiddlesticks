@@ -123,17 +123,17 @@ def candidate_passwords_from_alt_chars(
 
             for positions in itertools.combinations(range(len(guess)), num_subs):
 
-                pos_with_opts = [(i, alt_chars[i]) for i in positions if alt_chars[i]]
+                pos_with_opts = [alt_chars[i] for i in positions if alt_chars[i]]
                 
                 if len(pos_with_opts) != num_subs:
                     continue
                 
-                choices_per_pos = [opts for i, opts in pos_with_opts]
+                choices_per_pos = [opts for opts in pos_with_opts]
                 
                 for selected in itertools.product(*choices_per_pos):
 
                     candidate_password = list(guess)
-                    for (i, _), replacement in zip(pos_with_opts, selected):
+                    for i, replacement in zip(positions, selected):
                         candidate_password[i] = replacement
                     yield ''.join(candidate_password)
 

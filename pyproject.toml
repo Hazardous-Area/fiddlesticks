@@ -16,7 +16,7 @@ dynamic=["version"]
 dependencies = []
 
 [project.optional-dependencies]
-test = ["pytest", "hypothesis"]
+tests = ["pytest", "hypothesis"]
 aegis = ["py-avdu",]
 py7zr = ["py7zr",]
 

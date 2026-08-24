@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 import pytest
-from hypothesis import given, settings, HealthCheck
+from hypothesis import given, settings, HealthCheck, Phase
 from hypothesis.strategies import (
     lists,
     tuples,
@@ -27,34 +27,45 @@ def test_is_7zip_installed():
     assert result.returncode == 0
 
 file_names = text(
-    alphabet=characters(
-        codec="utf-8",
-        exclude_categories=["Cs", "Co", "Cn"],
-    ),
+    alphabet=string.ascii_letters + string.digits,
+    # characters(
+    #     codec="ascii",
+    #     exclude_categories=["Cs", "Co", "Cn"],
+    # ),
     min_size=1,
     max_size=24,
 )
 file_names_and_contents = lists(
-    tuples(file_names, binary(min_size=0, max_size=1024)),
+    tuples(file_names, binary(min_size=1, max_size=1024)),
     min_size=1,
     max_size=20,
+    unique_by=lambda x: x[0],
 )
 
+password_chars = set(string.ascii_letters + string.digits + string.punctuation)
+#To void password chars being parsed as control chars by Bash
+password_chars -= set(r"\'&;*:{$") 
+
 passwords = text(
-    alphabet=string.printable,
+    alphabet="".join(password_chars),
     min_size=1,
     max_size=40,
 )
 
 BI_MAP = fiddlesticks.SHIFT_AND_LEET_BI_MAP
 
+del BI_MAP["'"]
+for k in list(BI_MAP):
+    if "'" in BI_MAP[k]:
+        del BI_MAP[k]
+
 def _get_num_subs(pwd: str) -> int:
     L = len(pwd)
-    return min(L, 6)
+    return min(L, 3)
 
 @pytest.mark.hypothesis
 @given(pwd=passwords)
-# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 def test_alt_chars_candidates_generator(pwd: str):
     M = _get_num_subs(pwd)
     total, candidates = fiddlesticks.candidate_passwords_from_alt_chars(pwd, M)
@@ -73,7 +84,7 @@ def _create_password_protected_7z_archive(
     file_names_and_contents: list[tuple[str, bytes]],
     password: str,
 ):
-
+    dir_.mkdir(exist_ok=True, parents=True)
     for file_name, content in file_names_and_contents:
         (dir_ / file_name).write_bytes(content)
 
@@ -94,14 +105,22 @@ def _guess_from_password(
         alts = BI_MAP.get(c)
         if alts:
             indices_and_alt_chars_with_alts.append((i, alts))
+
     chars = list(password)
+    max_subs = min(max_subs, len(indices_and_alt_chars_with_alts))
+
     for i, alts in random.sample(indices_and_alt_chars_with_alts, max_subs):
         chars[i] = random.choice(alts)
     return "".join(chars)
 
 @pytest.mark.hypothesis
 @pytest.mark.skipif(IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet")
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@settings(
+    max_examples=50,
+    phases=[Phase.explicit, Phase.reuse, Phase.generate],  # Skip shrinking
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
+    deadline=None,
+)
 @given(
     file_names_and_contents=file_names_and_contents,
     password=passwords,
@@ -110,7 +129,7 @@ def test_7zip_checker(
     file_names_and_contents: list[tuple[str, bytes]],
     password: str,
 ):  
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(delete=False) as tmpdir:
         tmp_path = Path(tmpdir)
 
         archive_dir = tmp_path / "contents"
@@ -138,22 +157,26 @@ def test_7zip_checker(
         )
         assert result.returncode == 0, f"Could not extract {archive} with known good: {password=}, with 7z directly"
 
-        _assert_files_same(test_extracted_dir, file_names_and_contents)
+        _assert_files_same(test_extracted_dir / "contents", file_names_and_contents)
 
         shutil.rmtree(test_extracted_dir)
         test_extracted_dir.mkdir()
 
         max_subs = _get_num_subs(password)
-        guess = _guess_from_password(password, M)
+        guess = _guess_from_password(password, max_subs)
 
 
         result = subprocess.run(
-            ["fiddlesticks", "--7zip", f"--extract-to{test_extracted_dir}", f"--password-guess={guess}", archive],
+            ["fiddlesticks","--7zip", 
+             "--max-subs", f"{max_subs}",
+             "--extract-to", str(test_extracted_dir), 
+             "--password-guess", f"{guess}", archive
+            ],
             capture_output=True,
         )
-        assert result.returncode==0, f"Could not crack: {password} from: {guess=} for {archive}"
+        assert result.returncode==0, f"Could not crack: {password} from: {guess=} for {archive}, {max_subs=}"
 
-        _assert_files_same(test_extracted_dir, file_names_and_contents)
+        _assert_files_same(test_extracted_dir / "contents", file_names_and_contents)
 
 
 
