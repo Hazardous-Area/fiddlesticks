@@ -44,7 +44,7 @@ file_names_and_contents = lists(
 
 password_chars = set(string.ascii_letters + string.digits + string.punctuation)
 #To void password chars being parsed as control chars by Bash
-password_chars -= set(r"\'&;*:{$") 
+# password_chars -= set("\\"+r"'&;*:{$") 
 
 passwords = text(
     alphabet="".join(password_chars),
@@ -169,8 +169,8 @@ def test_7zip_checker(
         result = subprocess.run(
             ["fiddlesticks","--7zip", 
              "--max-subs", f"{max_subs}",
-             "--extract-to", str(test_extracted_dir), 
-             "--password-guess", f"{guess}", archive
+             f"--extract-to={test_extracted_dir}", 
+             f"--password-guess={guess}", archive
             ],
             capture_output=True,
         )
