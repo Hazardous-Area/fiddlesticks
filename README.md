@@ -6,7 +6,7 @@ Password recovery tool, for password-encrypted files, using simple off-line brut
 force attacks.  Password candidates are generated, using common variations 
 of a guessed password (e.g. typos and substitutions).  
 
-### Usage
+### Raison d'etre
  - Password-protected file owners recovering their own password themselves, as long as 
 they can still recall a rough guess for their password, might only need to test 
 every candidate password that's similar enough to the guess.  
@@ -42,18 +42,26 @@ archive can also do so - the password wasn't strong enough.
  a) helps them decide for themselves whether or not to trust Fiddlesticks 
  in the first place, in particular whether or not it will take their password guesses outside
  of its running environment.  When the project was concieved, the intention was also to design it to:
-  - c) require as little code as possible
- but the code has since become somewhat more complex, mainly in order to have a nice CLI.  Simplicity and brevity should be much more highly prized features of any software.  But you 
- be the judge of whether or not this c) is still the case.
 
- - Recommended use is simply to automate attempts to open a 7z archive via the user's own 7zip.
- - There are a couple of alternative modes too, firstly: automating any other external Bash command that a candidate password can be appended to (that obeys the normal return code convention).
- - Secondly candidate passwords can be sent to stdout, from where they can be piped to a
-  user's own external program or code (all the normal output from fiddlesticks goes to stderr).
- - Thirdly, if py7zr is also installed, fiddlesticks can use it to test passwords for 7z archived
+  - c) require as little code as possible
+ but the code has since become somewhat more complex, mainly in order to have a nice CLI.  Simplicity and brevity should both be much more highly prized features of any software, than they are.  But you 
+ be the judge of whether or not c) is still the case.
+
+### Usage
+Recommended use is simply to automate attempts to open a 7z archive via the user's own 7zip.
+
+There are a couple of alternative modes too, firstly: automating any other external Bash command that a candidate password can be appended to (that obeys the normal return code convention).
+
+Secondly with `--pipe` candidate passwords can be sent to stdout, from where they can be piped to a user's own external program or code (all the normal output from fiddlesticks goes to stderr).
+
+Thirdly, if py7zr is also installed, with `--py7zr` fiddlesticks can use it to test passwords for 7z archives,
  entirely within Python.
 
 ### Other Notes
+ - Successful attempts to extract a password-protected archive, result in the archive being
+ unencrypted (naturally) by some methods.  Currently all such plaintext unencrypted archives 
+ are not deleted from the file system afterwards.  If the options `--extract-to` or `-x` 
+ are given, archives are extracted there.
  - Fiddlesticks cannot recover passwords for online accounts.  Online password entry attempts 
  should be rate limited.  Cracking is only possible locally if the website owner shares the 
  password hash with the user, in which case they can probably provide the rest of their 
