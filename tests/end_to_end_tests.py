@@ -133,7 +133,7 @@ def test_7zip_checker(
     file_names_and_contents: list[tuple[str, bytes]],
     password: str,
 ):  
-    with tempfile.TemporaryDirectory(delete=False) as tmpdir:
+    with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
 
         archive_dir = tmp_path / "contents"
