@@ -14,6 +14,14 @@ every candidate password that's similar enough to the guess.
 than the one an adversary must do, without such a guess, but in posession 
 of a stolen password protected file[^0].
 
+### Warning
+Strictly speaking, Fiddlesticks is a password-protected file recovery tool.  Use it to 
+get your files back.  But once you've found a password that protected those files via Fiddlesticks
+(or any third party tool) it should not be used again.  Anywhere else it is also used, the 
+password should be reset (or the files re-encrypted with a different one).  By default,
+Fiddlesticks does not print the password it finds (or any candidates) unless `-P` or `-v` is set 
+(or if using `--pipe` with no pipe).
+
 ### "Back of envelope" sketch 'calculation'
  - Attackers targetting a truly[^0] random password, must try up to `2**N` 
  candidate passwords (for each bit length `N` being considered). 
