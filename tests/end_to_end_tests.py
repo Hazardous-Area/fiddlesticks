@@ -54,6 +54,8 @@ passwords = text(
 
 BI_MAP = fiddlesticks.SHIFT_AND_LEET_BI_MAP
 
+# Don't include ' being interpreted as a Bash control char
+# in the tests
 del BI_MAP["'"]
 for k in list(BI_MAP):
     if "'" in BI_MAP[k]:
@@ -64,6 +66,7 @@ def _get_num_subs(pwd: str) -> int:
     return min(L, 4)
 
 @pytest.mark.hypothesis
+@pytest.mark.slow
 @given(pwd=passwords)
 @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 def test_alt_chars_candidates_generator(pwd: str):
@@ -114,6 +117,7 @@ def _guess_from_password(
     return "".join(chars)
 
 @pytest.mark.hypothesis
+@pytest.mark.slow
 @pytest.mark.skipif(IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet")
 @settings(
     max_examples=50,

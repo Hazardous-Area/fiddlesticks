@@ -2,44 +2,69 @@
 *"Aaaagh!  I forgot my 7zip password"* - James (more times than he cares to remember).
 
 ## Description
-Brute force attacks on password encryption, using common variations (e.g. typos and substitusions)
-of a small number of guessed passwords.  
+Password recovery tool, for password-encrypted files, using simple off-line brute 
+force attacks.  Password candidates are generated, using common variations 
+of a guessed password (e.g. typos and substitutions).  
 
- - Attackers targetting a truly random password, must try 2 to the power of the number of bits
- candidate passwords (for each bit length being considered).  
- - Someone using open source password cracking tools, might only need to test every candidate
- password that's similar enough to their best guess of what the password was (and need only consider 
- every candidate within some maximum Weighted-Levenshtein distance from the guess).
+### Usage
+ - Password-protected file owners recovering their own password themselves, as long as 
+they can still recall a rough guess for their password, might only need to test 
+every candidate password that's similar enough to the guess.  
+ - This may be a much faster and cheaper computation
+than the one an adversary must do, without such a guess, but in posession 
+of a stolen password protected file[^0].
+
+### "Back of envelope" sketch 'calculation'
+ - Attackers targetting a truly[^0] random password, must try up to `2**N` 
+ candidate passwords (for each bit length `N` being considered). 
+ - Specifically, password owners may only need to consider every candidate within some 
+ maximum [Weighted-Levenshtein distance](https://en.wikipedia.org/wiki/Edit_distance#Types_of_edit_distance) 
+ from their best guess of the forgotten password, lets say a total of `M`.  
+ - Fiddlesticks is intended to assist recovering passwords from "close enough" guesses, 
+ when `M` is much smaller than `2**N`.
  - If Fiddlesticks can crack an archive's password with a starting guess of an empty string, 
- anyone with the archive can also do so - the password wasn't strong enough.
+(if `2**N` is also small enough to be feasible, with no guess) then anyone with the 
+archive can also do so - the password wasn't strong enough.
  - If Fiddlesticks fails to crack an archive's password given some starting guess, a lower
  bound on how similar the actual password is to the starting guess can still be deduced
- (e.g. this could be a gentle hint that the starting guess was wrong).
+ (e.g. this could indicate that the starting guess was wrong).
+
+ ### Design and security notes
  - Any similar 3rd party password cracking service based on 'best guess' passwords, requires 
  the user to share the guesses for their passwords with the service.  Even if the password
  was not used for anything else, sharing even guesses for secret credentials with 3rd parties, 
  is a critical security issue.
  - Fiddlesticks is designed to minimise the need for this.  It is designed to:
    - a) require as few dependencies as possible,
-   - b) require as little code as possible, and
-   - c) be as easy to install as possible.  
- The intention if firstly c) assists users to run Fiddlesticks in their own secure
+   - b) be as easy to install as possible.  
+ The intention is firstly b) assists users to run Fiddlesticks in their own secure
  environment, without requiring them to take their password guesses outside of that.  Secondly
- a) and b) help them decide for themselves whether or not to trust Fiddlesticks 
+ a) helps them decide for themselves whether or not to trust Fiddlesticks 
  in the first place, in particular whether or not it will take their password guesses outside
- of its running environment.
- - A small heirarchy of optional extras, more powerful password cracking tools is 
- available (py7zr and hashcat).
- - But if the user successfully recovers their password via simpler means before, then reviewing,
- auditting, trusting, and installing all that extra code can be avoided entirely.  Hence they are not 
- installed by default.
- - Please do not send us 7zip files containing sensitive data, or encrypted with your real 
- passwords.  Bug reports should use reproducible dummy data and dummy passwords. 
+ of its running environment.  When the project was concieved, the intention was also to design it to:
+  - c) require as little code as possible
+ but the code has since become somewhat more complex, mainly in order to have a nice CLI.  Simplicity and brevity should be much more highly prized features of any software.  But you 
+ be the judge of whether or not this c) is still the case.
+
+ - Recommended use is simply to automate attempts to open a 7z archive via the user's own 7zip.
+ - There are a couple of alternative modes too, firstly: automating any other external Bash command that a candidate password can be appended to (that obeys the normal return code convention).
+ - Secondly candidate passwords can be sent to stdout, from where they can be piped to a
+  user's own external program or code (all the normal output from fiddlesticks goes to stderr).
+ - Thirdly, if py7zr is also installed, fiddlesticks can use it to test passwords for 7z archived
+ entirely within Python.
+
+### Other Notes
  - Fiddlesticks cannot recover passwords for online accounts.  Online password entry attempts 
  should be rate limited.  Cracking is only possible locally if the website owner shares the 
  password hash with the user, in which case they can probably provide the rest of their 
- account data too (unless users' data is encrypted with keys derived from their 
- passwords but not from the password's hashes).  This would be a highly unusual server.  For 
- starters, password resets are then either impossible, or result in data loss.)
+ account data too.
+ - If Fiddlesticks fails to 'crack' or find a known password, this should not be taken as 
+ proof of the password's strength.  It won't ever be possible to think everything, and
+ we certainly don't wish users to draw a false sense of security from Fiddlesticks.
 
-## WARNING!!
+## Alternatives
+ - https://github.com/philsmd/7z2hashcat
+ - https://en.wikipedia.org/wiki/Dictionary_attack#Dictionary_attack_software
+
+[^0] Truly random passwords are difficult for humans to remember (without writing them down or saving them).
+At the very least, real world adversaries (posessing a stolen file or password hash) are likely to first attempt a [dictionary attack](https://en.wikipedia.org/wiki/Dictionary_attack#Dictionary_attack_software)
