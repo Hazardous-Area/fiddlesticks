@@ -11,20 +11,18 @@ __version__ = "0.0.0"
 import argparse
 import atexit
 import collections
-import functools
 import getpass
 import io
 import itertools
-from pathlib import Path
 import string
 import subprocess
 import sys
 import tempfile
 import textwrap
 import time
-from typing import Iterator, Iterable, Collection, Hashable, Callable
 import warnings
-
+from collections.abc import Callable, Hashable, Iterable, Iterator
+from pathlib import Path
 
 TMP_DIR = Path(tempfile.gettempdir()) / "fiddlesticks"
 TMP_DIR.mkdir(exist_ok=True)
@@ -144,18 +142,24 @@ def candidate_passwords_from_alt_chars(
 
 def make_py7zr_checker(archive: str, extract_to: str | None = None, **kwargs):
     import py7zr
+    exceptions = (py7zr.exceptions.PasswordRequired, py7zr.exceptions.Bad7zFile)
+    try:
+        import _lzma
+    except ImportError:
+        pass
+    else:
+        exceptions += ( _lzma.LZMAError,)
     if extract_to is None:
         extract_to = str(_make_new_tmp_sub_dir(archive))
     stream = io.BytesIO(Path(archive).read_bytes())
-    def is_correct_password_for_7z_file(candidate: str, ) -> bool:
+    def is_correct_password_for_7z_file(candidate: str) -> bool:
         stream.seek(0)
         try:
             f = py7zr.SevenZipFile(stream, 'r', password=candidate)
             f.extractall(path=extract_to)
-        except (py7zr.exceptions.PasswordRequired, py7zr.exceptions.Bad7zFile):
+        except exceptions:
             return False
-        else:
-            f.close()
+        f.close()
         return True
     return is_correct_password_for_7z_file
 
@@ -163,7 +167,7 @@ def make_py7zr_checker(archive: str, extract_to: str | None = None, **kwargs):
 def make_subprocess_checker(*args: str, **kwargs):
     *rest, last = args
     def is_correct_password(candidate: str) -> bool:
-        result = subprocess.run([*rest, f"{last}{candidate}"], capture_output=True)
+        result = subprocess.run([*rest, f"{last}{candidate}"], capture_output=True, check=False)
         return result.returncode==0
     return is_correct_password
 
@@ -181,7 +185,7 @@ class ProgramNotFound(Exception): pass
 
 def make_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
     args = ["7z", "--help"]
-    result =subprocess.run(args, capture_output=True)
+    result = subprocess.run(args, capture_output=True, check=False)
     if result.returncode != 0:
         raise ProgramNotFound(f"7zip.  Args: {args}")
 
@@ -453,7 +457,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
     t1 = time.time()
 
     if result is None:
-        print_to_stderr(f"\n\nCould not find password. Try a different guess, or increasing max substitutions (-N) ? ")
+        print_to_stderr("\n\nCould not find password. Try a different guess, or increasing max substitutions (-N) ? ")
         return 1
 
 
