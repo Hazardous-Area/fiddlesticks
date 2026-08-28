@@ -1,138 +1,105 @@
-from pathlib import Path
-import random
 import shutil
-import string
 import subprocess
-import sys
 import tempfile
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
-from hypothesis import given, settings, HealthCheck, Phase
-from hypothesis.strategies import (
-    lists,
-    tuples,
-    text,
-    characters,
-    binary,
-)
+from hypothesis import HealthCheck, Phase, given, settings
+from hypothesis.strategies import integers
 
 import fiddlesticks
 
-IS_WINDOWS = sys.platform=="win32"
-
-@pytest.mark.skipif(IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet")
-def test_is_7zip_installed():
-    args = ["7z", "--help"]
-    result = subprocess.run(args, capture_output=True)
-    assert result.returncode == 0
-
-file_names = text(
-    alphabet=string.ascii_letters + string.digits,
-    # characters(
-    #     codec="ascii",
-    #     exclude_categories=["Cs", "Co", "Cn"],
-    # ),
-    min_size=1,
-    max_size=24,
-)
-file_names_and_contents = lists(
-    tuples(file_names, binary(min_size=1, max_size=1024)),
-    min_size=1,
-    max_size=20,
-    unique_by=lambda x: x[0],
+from .helpers import (
+    IS_WINDOWS,
+    _assert_candidate_within_M_of_pwd,
+    _assert_files_same,
+    _create_password_protected_7z_archive,
+    _get_num_subs,
+    _guess_from_password,
+    file_names_and_contents,
+    passwords,
 )
 
-password_chars = set(string.ascii_letters + string.digits + string.punctuation)
-#To void password chars being parsed as control chars by Bash
-# password_chars -= set("\\"+r"'&;*:{$") 
+# A module scoped fixture is ideal for this.  But that 
+# needs mocks, patches or plug-ins etc.
+# Just make a copy including the required changes
+# and shadow the target. 
+BI_MAP_WITHOUT_SINGLE_QUOTES = {
+    k: v for k, v in fiddlesticks.SHIFT_AND_LEET_BI_MAP.items()
+    # Don't include "'" in the tests, 
+    # as it may be interpreted on the command line 
+    # as a Bash control character (literal str delimiter)
+    if k != "'"
+    if "'" not in v
+}
+BI_MAP = BI_MAP_WITHOUT_SINGLE_QUOTES
 
-passwords = text(
-    alphabet="".join(password_chars),
-    min_size=1,
-    max_size=40,
-)
+def _collate_args(num_subs: int, guess: str, *args: str) -> list[str]:
+    return [
+        "fiddlesticks",
+        "--max-subs", f"{num_subs}",
+        f"--password-guess={guess}",
+        *args
+    ]
 
-BI_MAP = fiddlesticks.SHIFT_AND_LEET_BI_MAP
+def make_internal_checker_args_collater(
+    checker: str,
+    ) -> Callable[[int, Path, str, str], list[str]]:
+    def collater(num_subs: int, test_extracted_dir: Path, guess: str, archive: str):
+        return _collate_args(
+            num_subs,
+            guess,
+            checker, 
+            f"--extract-to={test_extracted_dir}", 
+            archive,
+        )
+    return collater
 
-# Don't include ' being interpreted as a Bash control char
-# in the tests
-del BI_MAP["'"]
-for k in list(BI_MAP):
-    if "'" in BI_MAP[k]:
-        del BI_MAP[k]
-
-def _get_num_subs(pwd: str) -> int:
-    L = len(pwd)
-    return min(L, 4)
-
-@pytest.mark.hypothesis
-@pytest.mark.slow
-@given(pwd=passwords)
-@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
-def test_alt_chars_candidates_generator(pwd: str):
-    M = _get_num_subs(pwd)
-    total, candidates = fiddlesticks.candidate_passwords_from_alt_chars(pwd, M)
-    for candidate in candidates:
-        # Current implementation preserves length
-        assert len(pwd) == len(candidate)
-        i = 0
-        for c1, c2 in zip(pwd, candidate):
-            if c1 != c2:
-                i += 1
-                assert c1 in BI_MAP[c2] or c2 in BI_MAP[c1], f"Unrelated: {c1}, {c2}"
-        assert i <= M
-
-def _create_password_protected_7z_archive(
-    dir_: Path,
-    file_names_and_contents: list[tuple[str, bytes]],
-    password: str,
-):
-    dir_.mkdir(exist_ok=True, parents=True)
-    for file_name, content in file_names_and_contents:
-        (dir_ / file_name).write_bytes(content)
-
-def _assert_files_same(
-    dir_: Path,
-    file_names_and_contents: list[tuple[str, bytes]],
-):
-    for file_name, content in file_names_and_contents:
-        actual = (dir_ / file_name).read_bytes()
-        assert actual == content, f"File did not round trip.  Expected: {content=}.  Got: {actual=}"
-
-def _guess_from_password(
-    password: str,
-    max_subs: int,
-) -> str:
-    indices_and_alt_chars_with_alts = []
-    for i, c in enumerate(password):
-        alts = BI_MAP.get(c)
-        if alts:
-            indices_and_alt_chars_with_alts.append((i, alts))
-
-    chars = list(password)
-    max_subs = min(max_subs, len(indices_and_alt_chars_with_alts))
-
-    for i, alts in random.sample(indices_and_alt_chars_with_alts, max_subs):
-        chars[i] = random.choice(alts)
-    return "".join(chars)
+def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, archive: str):
+        return _collate_args(
+            num_subs,
+            guess,
+            "--shell", 
+            "--", # Tell argparse all subsequent args are positional
+            "7z", # Taken from make_7zip_checker
+            "x",
+            f"-o{test_extracted_dir}",
+            archive,
+            "-p",
+        )
 
 @pytest.mark.hypothesis
 @pytest.mark.slow
 @pytest.mark.skipif(IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet")
 @settings(
-    max_examples=50,
+    max_examples=10,
     phases=[Phase.explicit, Phase.reuse, Phase.generate],  # Skip shrinking
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
     deadline=None,
+    derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
+    # (despite that the default is True in CI ???
+    # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
 )
+@pytest.mark.parametrize("make_args",[
+    make_internal_checker_args_collater("--7zip"),
+    make_internal_checker_args_collater("--7zip-persistent"),
+    make_internal_checker_args_collater("--py7zr"),
+    shell_collater,
+])
 @given(
     file_names_and_contents=file_names_and_contents,
     password=passwords,
 )
-def test_7zip_checker(
+def test_7z_archives_extracted_via_fiddlesticks_CLI(
     file_names_and_contents: list[tuple[str, bytes]],
     password: str,
+    make_args: Callable[[int, Path, str,str], list[str]],
 ):  
+
+    MAX_NUM_SUBS: int = 3
+
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
 
@@ -149,15 +116,19 @@ def test_7zip_checker(
         result = subprocess.run(
             ["7z", "a", "-mhe=on", f"-p{password}", archive, str(archive_dir)],
             capture_output=True,
+            check=False,
         )
         assert result.returncode == 0, f"Could not create 7z archive from: {password=}, containing: {file_names_and_contents}"
 
         test_extracted_dir = tmp_path / "test_extracted"
         test_extracted_dir.mkdir()
 
+        # Test if extraction directly with 7z actually works in the test env,
+        # before testing if fiddlesticks can do this too.
         result = subprocess.run(
             ["7z", "x", f"-p{password}", f"-o{test_extracted_dir}", archive],
             capture_output=True,
+            check=False,
         )
         assert result.returncode == 0, f"Could not extract {archive} with known good: {password=}, with 7z directly"
 
@@ -166,24 +137,54 @@ def test_7zip_checker(
         shutil.rmtree(test_extracted_dir)
         test_extracted_dir.mkdir()
 
-        max_subs = _get_num_subs(password)
-        guess = _guess_from_password(password, max_subs)
+        num_subs = _get_num_subs(password, MAX_NUM_SUBS)
+        guess = _guess_from_password(password, num_subs)
 
 
         result = subprocess.run(
-            ["fiddlesticks","--7zip", 
-             "--max-subs", f"{max_subs}",
-             f"--extract-to={test_extracted_dir}", 
-             f"--password-guess={guess}", archive
-            ],
+            make_args(num_subs, test_extracted_dir, guess, archive),
             capture_output=True,
+            check=False,
         )
-        assert result.returncode==0, f"Could not crack: {password} from: {guess=} for {archive}, {max_subs=}"
+        assert result.returncode==0, f"Could not crack: {password} from: {guess=} for {archive}, {num_subs=}"
 
         _assert_files_same(test_extracted_dir / "contents", file_names_and_contents)
 
 
 
+@pytest.mark.hypothesis
+@pytest.mark.slow
+@pytest.mark.skipif(IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet")
+@settings(
+    max_examples=10,
+    phases=[Phase.explicit, Phase.reuse, Phase.generate],  # Skip shrinking
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
+    deadline=None,
+    derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
+    # (despite that the default is True in CI ???
+    # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
+)
+@given(
+    password=passwords,
+    num_subs=integers(min_value=0, max_value=5),
+)
+def test_piping_candidates_to_stdout(
+    password: str,
+    num_subs: int,
+):  
+
+    guess = _guess_from_password(password, num_subs)
+
+
+    result = subprocess.run(
+        _collate_args(num_subs, guess, "--pipe"),
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode==0, f"Could not --pipe candidate passwords, {num_subs=}, {guess=}"
+
+    for candidate in result.stdout.decode().splitlines():
+        _assert_candidate_within_M_of_pwd(candidate, password, M=num_subs)
 
 
 
