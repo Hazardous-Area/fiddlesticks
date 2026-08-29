@@ -456,7 +456,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
 
     t1 = time.time()
 
-    if result is None:
+    if result is None and not namespace.pipe:
         print_to_stderr("\n\nCould not find password. Try a different guess, or increasing max substitutions (-N) ? ")
         return 1
 
