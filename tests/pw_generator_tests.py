@@ -10,14 +10,7 @@ from .helpers import (
     passwords_alts_and_num_subs,
 )
 
-password_chars = set(string.ascii_letters + string.digits + string.punctuation)
 
-
-passwords = text(
-    alphabet="".join(password_chars),
-    min_size=1,
-    max_size=40,
-)
 
 
 @pytest.mark.hypothesis
