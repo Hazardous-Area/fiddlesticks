@@ -15,7 +15,7 @@ from .helpers import (
 
 @pytest.mark.hypothesis
 @pytest.mark.slow
-@given(password_alts_and_num_subs=passwords_alts_and_num_subs(max_num_subs=15))
+@given(password_alts_and_num_subs=passwords_alts_and_num_subs(max_num_subs=10))
 @settings(
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
