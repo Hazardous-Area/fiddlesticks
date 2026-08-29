@@ -160,9 +160,9 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
     phases=[Phase.explicit, Phase.reuse, Phase.generate],  # Skip shrinking
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
     deadline=None,
-    derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
-    # (despite that the default is True in CI ???
-    # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
+    # derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
+    # # (despite that the default is True in CI ???
+    # # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
 )
 @given(
     password=passwords,
