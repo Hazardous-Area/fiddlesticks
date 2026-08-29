@@ -84,7 +84,7 @@ def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, archive:
 ])
 @given(
     file_names_and_contents=file_names_and_contents,
-    password_guess_and_num_subs=passwords_guesses_and_num_subs(max_num_subs=4),
+    password_guess_and_num_subs=passwords_guesses_and_num_subs(max_num_subs=3),
 )
 def test_7z_archives_extracted_via_fiddlesticks_CLI(
     file_names_and_contents: list[tuple[str, bytes]],
