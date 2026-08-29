@@ -89,7 +89,7 @@ def passwords_guesses_and_num_subs(draw, max_num_subs: int = 3):
     for i, c in enumerate(password):
         alts = BI_MAP.get(c)
         if alts:
-            indices_and_alts.append((i, alts))
+            indices_and_alts.append((i, "".join(alts)))
 
     num_subs = draw(integers(min_value=0, max_value=len(indices_and_alts)))
 
