@@ -6,7 +6,9 @@ from pathlib import Path
 
 from hypothesis.strategies import (
     binary,
+    composite, # Can be slow
     lists,
+    sampled_from,
     text,
     tuples,
 )
@@ -39,6 +41,7 @@ passwords = text(
     min_size=1,
     max_size=40,
 )
+
 
 def _get_num_subs(pwd: str, max_num_subs: int = 3) -> int:
     L = len(pwd)
@@ -77,6 +80,36 @@ def _guess_from_password(
     for i, alts in random.sample(indices_and_alt_chars_with_alts, num_subs):
         chars[i] = random.choice(alts)
     return "".join(chars)
+
+@composite
+def passwords_guesses_and_num_subs(draw, max_num_subs: int = 3):
+    password = draw(passwords)
+
+    indices_and_alts = []
+    for i, c in enumerate(password):
+        alts = BI_MAP.get(c)
+        if alts:
+            indices_and_alts.append((i, alts))
+
+    num_subs = draw(integers(min_value=0, max_value=len(indices_and_alts)))
+
+    selected_alts = draw(
+        lists(
+            sampled_from(indices_and_alts),
+            min_size=num_subs,
+            max_size=num_subs,
+            unique=True,
+        )
+    )
+    
+    chars = list(password)
+
+    for i, alts in selected_alts:
+        chars[i] = draw(sampled_from(alts))
+
+    return password, "".join(chars), num_subs
+
+
 
 def _assert_candidate_within_M_of_pwd(candidate: str, pwd: str, M: int) -> None:
     # Current implementation preserves length

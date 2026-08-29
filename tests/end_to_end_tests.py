@@ -19,6 +19,7 @@ from .helpers import (
     _guess_from_password,
     file_names_and_contents,
     passwords,
+    passwords_guesses_and_num_subs,
 )
 
 # A module scoped fixture is ideal for this.  But that 
@@ -165,16 +166,13 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
     # # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
 )
 @given(
-    password=passwords,
-    num_subs=integers(min_value=0, max_value=5),
+    password_guess_and_num_subs=passwords_guesses_and_num_subs(max_num_subs=5),
 )
 def test_piping_candidates_to_stdout(
-    password: str,
-    num_subs: int,
+    password_guess_and_num_subs: tuple[str,str,int],
 ):  
 
-    guess = _guess_from_password(password, num_subs)
-
+    password, guess, num_subs = password_guess_and_num_subs
 
     result = subprocess.run(
         _collate_args(num_subs, guess, "--pipe"),
@@ -183,8 +181,12 @@ def test_piping_candidates_to_stdout(
     )
     assert result.returncode==0, f"Could not --pipe candidate passwords, {num_subs=}, {guess=}"
 
+    candidates = set()
     for candidate in result.stdout.decode().splitlines():
         _assert_candidate_within_M_of_pwd(candidate, guess, M=num_subs)
+        candidates.add(candidate)
+
+    assert password in candidates, f"Did not find {password=} from {guess=}, {num_subs=}, {candidates=}"
 
 
 
