@@ -13,10 +13,7 @@ from .helpers import (
     _assert_candidate_within_M_of_pwd,
     _assert_files_same,
     _create_password_protected_7z_archive,
-    _get_num_subs,
-    _guess_from_password,
     file_names_and_contents,
-    passwords,
     passwords_guesses_and_num_subs,
 )
 
