@@ -96,12 +96,12 @@ def pipe_to_bash_while_loop_collater(
     # (despite that the default is True in CI ???
     # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
 )
-@pytest.mark.parametrize("make_args",[
-    make_internal_checker_args_collater("--7zip"),
-    make_internal_checker_args_collater("--7zip-persistent"),
-    make_internal_checker_args_collater("--py7zr"),
-    shell_collater,
-    pipe_to_bash_while_loop_collater,
+@pytest.mark.parametrize("make_args,shell",[
+    (make_internal_checker_args_collater("--7zip"), False),
+    (make_internal_checker_args_collater("--7zip-persistent"), False),
+    (make_internal_checker_args_collater("--py7zr"), False),
+    (shell_collater,False),
+    (pipe_to_bash_while_loop_collater,True),
 ])
 @given(
     file_names_and_contents=file_names_and_contents,
@@ -111,6 +111,7 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
     file_names_and_contents: list[tuple[str, bytes]],
     password_guess_and_num_subs: tuple[str,str,int],
     make_args: Callable[[int, Path, str,str], list[str]],
+    shell: bool,
 ):  
 
     password, guess, num_subs = password_guess_and_num_subs
@@ -145,6 +146,7 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
             ["7z", "x", f"-p{password}", f"-o{test_extracted_dir}", archive],
             capture_output=True,
             check=False,
+            shell=shell,
         )
         assert result.returncode == 0, f"Could not extract {archive} with known good: {password=}, with 7z directly"
 
