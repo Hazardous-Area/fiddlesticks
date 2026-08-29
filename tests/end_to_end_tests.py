@@ -88,15 +88,15 @@ def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, archive:
 ])
 @given(
     file_names_and_contents=file_names_and_contents,
-    password=passwords,
+    password_guess_and_num_subs=passwords_guesses_and_num_subs(max_num_subs=3),
 )
 def test_7z_archives_extracted_via_fiddlesticks_CLI(
     file_names_and_contents: list[tuple[str, bytes]],
-    password: str,
+    password_guess_and_num_subs: tuple[str,str,int],
     make_args: Callable[[int, Path, str,str], list[str]],
 ):  
 
-    MAX_NUM_SUBS: int = 3
+    password, guess, num_subs = password_guess_and_num_subs
 
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -135,9 +135,6 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
 
         shutil.rmtree(test_extracted_dir)
         test_extracted_dir.mkdir()
-
-        num_subs = _get_num_subs(password, MAX_NUM_SUBS)
-        guess = _guess_from_password(password, num_subs)
 
 
         result = subprocess.run(
