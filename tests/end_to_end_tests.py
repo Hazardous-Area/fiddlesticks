@@ -53,17 +53,37 @@ def make_internal_checker_args_collater(
     return collater
 
 def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, archive: str):
-        return _collate_args(
-            num_subs,
-            guess,
-            "--shell", 
-            "--", # Tell argparse all subsequent args are positional
-            "7z", # Taken from make_7zip_checker
-            "x",
-            f"-o{test_extracted_dir}",
-            archive,
-            "-p",
-        )
+    return _collate_args(
+        num_subs,
+        guess,
+        "--shell", 
+        "--", # Tell argparse all subsequent args are positional
+        "7z", # Taken from make_7zip_checker
+        "x",
+        f"-o{test_extracted_dir}",
+        archive,
+        "-p",
+    )
+
+def pipe_to_bash_while_loop_collater(
+    num_subs: int,
+    test_extracted_dir: Path,
+    guess: str,
+    archive: str):
+
+    script_text = fiddlesticks.PERSISTENT_7Z_CHECKER_OUTLINE.format(
+        extract_to=str(test_extracted_dir),
+        file=archive)
+    script_path = Path(tempfile.gettempdir()) / "persistent_checker.sh"
+    script_path.write_text(script_text)
+    return _collate_args(
+        num_subs,
+        guess,
+        "--",
+        "--pipe",
+        "|",
+        str(script_path),
+    ]
 
 @pytest.mark.hypothesis
 @pytest.mark.slow
@@ -81,6 +101,7 @@ def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, archive:
     make_internal_checker_args_collater("--7zip-persistent"),
     make_internal_checker_args_collater("--py7zr"),
     shell_collater,
+    pipe_to_bash_while_loop_collater,
 ])
 @given(
     file_names_and_contents=file_names_and_contents,
