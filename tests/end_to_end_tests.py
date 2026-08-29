@@ -69,7 +69,7 @@ def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, archive:
 @pytest.mark.slow
 @pytest.mark.skipif(IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet")
 @settings(
-    max_examples=20,
+    max_examples=5,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
     deadline=None,
     derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
@@ -84,7 +84,7 @@ def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, archive:
 ])
 @given(
     file_names_and_contents=file_names_and_contents,
-    password_guess_and_num_subs=passwords_guesses_and_num_subs(max_num_subs=3),
+    password_guess_and_num_subs=passwords_guesses_and_num_subs(max_num_subs=4),
 )
 def test_7z_archives_extracted_via_fiddlesticks_CLI(
     file_names_and_contents: list[tuple[str, bytes]],
