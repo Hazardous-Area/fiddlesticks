@@ -17,7 +17,7 @@ from .helpers import (
 @pytest.mark.slow
 @given(password_alts_and_num_subs=passwords_alts_and_num_subs(max_num_subs=3))
 @settings(
-    max_examples=4,
+    max_examples=40,
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
 )
