@@ -456,7 +456,10 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
 
     t1 = time.time()
 
-    if result is None and not namespace.pipe:
+    if result is None 
+        if namespace.checker_factory is make_password_candidate_piper:
+            return 0
+            
         print_to_stderr("\n\nCould not find password. Try a different guess, or increasing max substitutions (-N) ? ")
         return 1
 
