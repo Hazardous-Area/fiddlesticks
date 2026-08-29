@@ -184,7 +184,7 @@ def test_piping_candidates_to_stdout(
     assert result.returncode==0, f"Could not --pipe candidate passwords, {num_subs=}, {guess=}"
 
     for candidate in result.stdout.decode().splitlines():
-        _assert_candidate_within_M_of_pwd(candidate, password, M=num_subs)
+        _assert_candidate_within_M_of_pwd(candidate, guess, M=num_subs)
 
 
 
