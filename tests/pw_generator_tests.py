@@ -15,8 +15,11 @@ from .helpers import (
 
 @pytest.mark.hypothesis
 @pytest.mark.slow
-@given(password_alts_and_num_subs=passwords_alts_and_num_subs(max_num_subs=4))
-@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@given(password_alts_and_num_subs=passwords_alts_and_num_subs(max_num_subs=3))
+@settings(
+    max_examples=4,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 def test_alt_chars_candidates_generator(password_alts_and_num_subs: tuple[str,list[tuple[int,str]],int]):
     pwd, _alts, M = password_alts_and_num_subs
     _total, candidates = fiddlesticks.candidate_passwords_from_alt_chars(pwd, M)

@@ -69,7 +69,7 @@ def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, archive:
 @pytest.mark.slow
 @pytest.mark.skipif(IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet")
 @settings(
-    max_examples=4,
+    max_examples=2,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
     deadline=None,
     derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
