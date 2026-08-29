@@ -4,11 +4,9 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+import fiddlesticks
 import pytest
 from hypothesis import HealthCheck, Phase, given, settings
-from hypothesis.strategies import integers
-
-import fiddlesticks
 
 from .helpers import (
     IS_WINDOWS,
