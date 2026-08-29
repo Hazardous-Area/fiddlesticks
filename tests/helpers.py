@@ -1,17 +1,18 @@
 
-import random
 import string
 import sys
 from pathlib import Path
 
+import fiddlesticks
 from hypothesis.strategies import (
     binary,
+    composite,  # Can be slow
+    integers,
     lists,
+    sampled_from,
     text,
     tuples,
 )
-
-import fiddlesticks
 
 IS_WINDOWS = sys.platform == "win32"
 BI_MAP = fiddlesticks.SHIFT_AND_LEET_BI_MAP
@@ -40,9 +41,6 @@ passwords = text(
     max_size=40,
 )
 
-def _get_num_subs(pwd: str, max_num_subs: int = 3) -> int:
-    L = len(pwd)
-    return min(L, max_num_subs)
 
 def _create_password_protected_7z_archive(
     dir_: Path,
@@ -61,22 +59,41 @@ def _assert_files_same(
         actual = (dir_ / file_name).read_bytes()
         assert actual == content, f"File did not round trip.  Expected: {content=}.  Got: {actual=}"
 
-def _guess_from_password(
-    password: str,
-    num_subs: int,
-) -> str:
-    indices_and_alt_chars_with_alts = []
+@composite
+def passwords_alts_and_num_subs(draw, max_num_subs: int = 3):
+    password = draw(passwords)
+
+    indices_and_alts = []
     for i, c in enumerate(password):
         alts = BI_MAP.get(c)
         if alts:
-            indices_and_alt_chars_with_alts.append((i, alts))
+            indices_and_alts.append((i, "".join(alts)))
+
+    num_subs = draw(integers(min_value=0, max_value=min(max_num_subs, len(indices_and_alts))))
+
+    all_alts = draw(
+        lists(
+            sampled_from(indices_and_alts),
+            min_size=num_subs,
+            max_size=num_subs,
+            unique=True,
+        )
+    )
+    return password, all_alts, num_subs
+
+@composite
+def passwords_guesses_and_num_subs(draw, max_num_subs: int = 3):
+    
+    password, all_alts, num_subs = draw(passwords_alts_and_num_subs(max_num_subs))
 
     chars = list(password)
-    num_subs = min(num_subs, len(indices_and_alt_chars_with_alts))
 
-    for i, alts in random.sample(indices_and_alt_chars_with_alts, num_subs):
-        chars[i] = random.choice(alts)
-    return "".join(chars)
+    for i, alts in all_alts:
+        chars[i] = draw(sampled_from(alts))
+
+    return password, "".join(chars), num_subs
+
+
 
 def _assert_candidate_within_M_of_pwd(candidate: str, pwd: str, M: int) -> None:
     # Current implementation preserves length

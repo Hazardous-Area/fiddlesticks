@@ -4,21 +4,17 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+import fiddlesticks
 import pytest
 from hypothesis import HealthCheck, Phase, given, settings
-from hypothesis.strategies import integers
-
-import fiddlesticks
 
 from .helpers import (
     IS_WINDOWS,
     _assert_candidate_within_M_of_pwd,
     _assert_files_same,
     _create_password_protected_7z_archive,
-    _get_num_subs,
-    _guess_from_password,
     file_names_and_contents,
-    passwords,
+    passwords_guesses_and_num_subs,
 )
 
 # A module scoped fixture is ideal for this.  But that 
@@ -73,8 +69,7 @@ def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, archive:
 @pytest.mark.slow
 @pytest.mark.skipif(IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet")
 @settings(
-    max_examples=10,
-    phases=[Phase.explicit, Phase.reuse, Phase.generate],  # Skip shrinking
+    max_examples=5,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
     deadline=None,
     derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
@@ -89,15 +84,15 @@ def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, archive:
 ])
 @given(
     file_names_and_contents=file_names_and_contents,
-    password=passwords,
+    password_guess_and_num_subs=passwords_guesses_and_num_subs(max_num_subs=3),
 )
 def test_7z_archives_extracted_via_fiddlesticks_CLI(
     file_names_and_contents: list[tuple[str, bytes]],
-    password: str,
+    password_guess_and_num_subs: tuple[str,str,int],
     make_args: Callable[[int, Path, str,str], list[str]],
 ):  
 
-    MAX_NUM_SUBS: int = 3
+    password, guess, num_subs = password_guess_and_num_subs
 
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -137,9 +132,6 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
         shutil.rmtree(test_extracted_dir)
         test_extracted_dir.mkdir()
 
-        num_subs = _get_num_subs(password, MAX_NUM_SUBS)
-        guess = _guess_from_password(password, num_subs)
-
 
         result = subprocess.run(
             make_args(num_subs, test_extracted_dir, guess, archive),
@@ -160,21 +152,18 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
     phases=[Phase.explicit, Phase.reuse, Phase.generate],  # Skip shrinking
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
     deadline=None,
-    derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
-    # (despite that the default is True in CI ???
-    # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
+    # derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
+    # # (despite that the default is True in CI ???
+    # # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
 )
 @given(
-    password=passwords,
-    num_subs=integers(min_value=0, max_value=5),
+    password_guess_and_num_subs=passwords_guesses_and_num_subs(max_num_subs=5),
 )
 def test_piping_candidates_to_stdout(
-    password: str,
-    num_subs: int,
+    password_guess_and_num_subs: tuple[str,str,int],
 ):  
 
-    guess = _guess_from_password(password, num_subs)
-
+    password, guess, num_subs = password_guess_and_num_subs
 
     result = subprocess.run(
         _collate_args(num_subs, guess, "--pipe"),
@@ -183,8 +172,12 @@ def test_piping_candidates_to_stdout(
     )
     assert result.returncode==0, f"Could not --pipe candidate passwords, {num_subs=}, {guess=}"
 
+    candidates = set()
     for candidate in result.stdout.decode().splitlines():
         _assert_candidate_within_M_of_pwd(candidate, guess, M=num_subs)
+        candidates.add(candidate)
+
+    assert password in candidates, f"Did not find {password=} from {guess=}, {num_subs=}, {candidates=}"
 
 
 

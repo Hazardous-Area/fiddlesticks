@@ -1,5 +1,6 @@
 # Fiddlesticks!
 *"Aaaagh!  I forgot my 7zip password"* - James (more times than he cares to remember).
+![Tests passing](https://github.com/Hazardous-Area/fiddlesticks/actions/workflows/tests.yml/badge.svg)
 
 ## Description
 Password recovery tool, for password-encrypted files, using simple off-line brute 
