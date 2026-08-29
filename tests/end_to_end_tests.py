@@ -83,7 +83,7 @@ def pipe_to_bash_while_loop_collater(
         "--pipe",
         "|",
         str(script_path),
-    ]
+    )
 
 @pytest.mark.hypothesis
 @pytest.mark.slow
