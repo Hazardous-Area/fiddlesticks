@@ -15,7 +15,7 @@ from .helpers import (
 
 @pytest.mark.hypothesis
 @pytest.mark.slow
-@given(password_alts_and_num_subs=passwords_alts_and_num_subs(max_num_subs=3))
+@given(password_alts_and_num_subs=passwords_alts_and_num_subs(max_num_subs=5))
 @settings(
     max_examples=40,
     deadline=None,
