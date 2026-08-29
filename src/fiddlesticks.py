@@ -200,11 +200,7 @@ def make_password_candidate_piper(**kwargs):
         return False
     return piper
 
-def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
-    if extract_to is None:
-        extract_to = str(_make_new_tmp_sub_dir(file))
-
-    cmd = textwrap.dedent(f"""\
+PERSISTENT_7Z_CHECKER_OUTLINE = """\
     while read -r line; do
     
     # Silently run command, only check exit code
@@ -215,7 +211,13 @@ def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwa
     fi
     echo "Nope :("
     done
-    """)
+    """
+
+def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
+    if extract_to is None:
+        extract_to = str(_make_new_tmp_sub_dir(file))
+
+    cmd = textwrap.dedent(PERSISTENT_7Z_CHECKER_OUTLINE.format(extract_to=extract_to, file=file))
 
     # Launch a single persistent Bash process reading from stdin line-by-line
     proc = subprocess.Popen(
@@ -239,6 +241,24 @@ def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwa
     def cleanup():
         proc.stdin.close()
         proc.wait()
+
+    return checker
+
+
+def make_py_avdu_aegis_checker(file: str, **kwargs):
+    from py_avdu.encrypted_classes import VaultEncrypted
+
+    vault_dict = json.loads(pathlib.Path(file).read_text())
+
+    encrypted = VaultEncrypted(**vault_dict)
+
+    def checker(candidate: str) -> bool:
+        try:
+            encrypted.find_master_key(candidate)
+            return True
+        except ValueError:
+            return False
+        
 
     return checker
 
