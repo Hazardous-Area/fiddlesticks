@@ -69,7 +69,7 @@ def passwords_alts_and_num_subs(draw, max_num_subs: int = 3):
         if alts:
             indices_and_alts.append((i, "".join(alts)))
 
-    num_subs = draw(integers(min_value=0, max_value=len(indices_and_alts)))
+    num_subs = draw(integers(min_value=0, max_value=min(max_num_subs, len(indices_and_alts))))
 
     all_alts = draw(
         lists(
