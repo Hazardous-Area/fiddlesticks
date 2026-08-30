@@ -24,7 +24,7 @@ def _collate_args(num_subs: int, guess: str, *args: str) -> list[str]:
     return [
         "fiddlesticks",
         "--max-subs", f"{num_subs}",
-        f"'--password-guess={guess}'",
+        f"--password-guess={guess}",
         *args
     ]
 
