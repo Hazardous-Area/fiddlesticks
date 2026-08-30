@@ -1,3 +1,4 @@
+import shlex
 import shutil
 import stat
 import string
@@ -18,21 +19,9 @@ from .helpers import (
     _create_password_protected_7z_archive,
     file_names_and_contents,
     passwords_guesses_and_num_subs,
+    password_chars,
 )
 
-# A module scoped fixture is ideal for this.  But that 
-# needs mocks, patches or plug-ins etc.
-# Just make a copy including the required changes
-# and shadow the target. 
-BI_MAP_WITHOUT_SINGLE_QUOTES = {
-    k: v for k, v in fiddlesticks.SHIFT_AND_LEET_BI_MAP.items()
-    # Don't include punctuation in the tests, 
-    # as it may be interpreted on the command line 
-    # as a Bash control character (literal str delimiter)
-    if k not in string.punctuation
-    if all(c not in v for c in string.punctuation)
-}
-BI_MAP = BI_MAP_WITHOUT_SINGLE_QUOTES
 
 def _collate_args(num_subs: int, guess: str, *args: str) -> list[str]:
     return [
@@ -163,7 +152,7 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
 
         cmd_args = make_args(num_subs, test_extracted_dir, guess, archive)
         if shell:
-            cmd_args = " ".join(cmd_args)
+            cmd_args = " ".join(shlex.quote(arg) for arg in cmd_args)
         result = subprocess.run(
             cmd_args,
             capture_output=True,

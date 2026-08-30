@@ -61,7 +61,10 @@ def _assert_files_same(
         assert actual == content, f"File did not round trip.  Expected: {content=}.  Got: {actual=}"
 
 @composite
-def passwords_alts_and_num_subs(draw, max_num_subs: int = 3):
+def passwords_alts_and_num_subs(
+    draw,
+    max_num_subs: int = 3,
+    ):
     password = draw(passwords)
 
     indices_and_alts = []
@@ -83,7 +86,10 @@ def passwords_alts_and_num_subs(draw, max_num_subs: int = 3):
     return password, all_alts, num_subs
 
 @composite
-def passwords_guesses_and_num_subs(draw, max_num_subs: int = 3):
+def passwords_guesses_and_num_subs(
+    draw,
+    max_num_subs: int = 3,
+    ):
     
     password, all_alts, num_subs = draw(passwords_alts_and_num_subs(max_num_subs))
 
