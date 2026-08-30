@@ -18,6 +18,7 @@ jobs:
           "test_aegis_checker_from_CLI",
           "test_aegis_checker_errors_from_CLI",
           "test_aegis_checker_against_avdu_vault",
+          "test_pykeepass_checker_against_Test_vault",
         ]
     steps:
     - name: Check out repo

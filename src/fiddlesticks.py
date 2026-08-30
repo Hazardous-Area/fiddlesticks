@@ -321,6 +321,8 @@ def test_passwords_sequentially(
 default_password_protected_file_checker_factories = {
     ".7z" : make_7zip_checker,
     ".json" : make_py_avdu_aegis_checker,
+    ".kdbx" : make_pykeepass_checker,
+    ".kdb" : make_pykeepass_checker,
 }
 
 
