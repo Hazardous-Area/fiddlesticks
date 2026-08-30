@@ -161,5 +161,5 @@ def avdu_test_vault(tmp_path_factory):
         check=True,
         capture_output=True,
     )
-    return avdu_repo / "avdu" / "test" / "data" / "aegis_encrypted.json"
+    return avdu_repo / "test" / "data" / "aegis_encrypted.json"
     
