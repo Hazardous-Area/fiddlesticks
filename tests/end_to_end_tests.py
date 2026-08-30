@@ -13,6 +13,7 @@ import fiddlesticks
 
 from .helpers import (
     IS_WINDOWS,
+    avdu_test_vault,
     _assert_candidate_within_M_of_pwd,
     _assert_files_same,
     _create_password_protected_7z_archive,

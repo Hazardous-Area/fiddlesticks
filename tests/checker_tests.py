@@ -4,7 +4,7 @@ import pytest
 
 from fiddlesticks import make_py_avdu_aegis_checker, make_pykeepass_checker
 
-from .helpers import IS_WINDOWS, KDBX_TEST_VAULT
+from .helpers import IS_WINDOWS, KDBX_TEST_VAULT, avdu_test_vault
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet")
