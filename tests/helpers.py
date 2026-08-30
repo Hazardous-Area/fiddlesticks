@@ -1,8 +1,8 @@
 
-from pathlib import Path
 import string
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 from hypothesis.strategies import (
@@ -68,6 +68,7 @@ def _assert_files_same(
 
 @composite
 def _alts_and_num_subs_from_password(
+    draw,
     password: str,
     max_num_subs: int = 3,
     ):
@@ -94,8 +95,8 @@ def _alts_and_num_subs_from_password(
 
 @composite
 def selected_alts_and_num_subs_from_password(
-    password: str,
     draw,
+    password: str,
     max_num_subs: int = 3,
     ):
     selected_alts, num_subs = draw(_alts_and_num_subs_from_password(password, max_num_subs))
@@ -105,7 +106,7 @@ def selected_alts_and_num_subs_from_password(
 def guesses_from_alts(
     draw,
     password: str,
-    alts: list[tuple[int,str]],
+    selected_alts: list[tuple[int,str]],
     ):
     
     chars = list(password)
