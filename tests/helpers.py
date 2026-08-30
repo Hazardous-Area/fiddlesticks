@@ -122,7 +122,7 @@ def guesses_and_num_subs_from_password(
     ):
     selected_alts, num_subs = draw(selected_alts_and_num_subs_from_password(password, max_num_subs))
     guess = draw(guesses_from_alts(password, selected_alts))
-    return password, guess, num_subs
+    return guess, num_subs
 
 @composite
 def passwords_guesses_and_num_subs(
