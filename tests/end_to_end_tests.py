@@ -228,9 +228,8 @@ def test_piping_candidates_to_stdout(
 )
 def test_aegis_checker_from_CLI(guess_and_num_subs, avdu_test_vault):    
     guess, num_subs = guess_and_num_subs
-    vault = avdu_test_vault()
     result = subprocess.run(
-        _collate_args(num_subs, guess, "--aegis", str(vault)),
+        _collate_args(num_subs, guess, "--aegis", str(avdu_test_vault)),
         capture_output=True,
         check=False,    
     )
