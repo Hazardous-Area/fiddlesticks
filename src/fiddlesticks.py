@@ -196,7 +196,7 @@ def make_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
 
     return make_subprocess_checker("7z","x", f"-o{extract_to}", file, "-p")
 
-def make_password_candidate_piper(**kwargs):
+def make_password_candidate_piper(*args, **kwargs):
     def piper(password: str):
         print(password, file=sys.stdout)
         return False
