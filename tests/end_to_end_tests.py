@@ -1,5 +1,6 @@
 import shutil
 import stat
+import string
 import subprocess
 import tempfile
 from collections.abc import Callable
@@ -25,11 +26,11 @@ from .helpers import (
 # and shadow the target. 
 BI_MAP_WITHOUT_SINGLE_QUOTES = {
     k: v for k, v in fiddlesticks.SHIFT_AND_LEET_BI_MAP.items()
-    # Don't include "'" in the tests, 
+    # Don't include punctuation in the tests, 
     # as it may be interpreted on the command line 
     # as a Bash control character (literal str delimiter)
-    if k != "'"
-    if "'" not in v
+    if k not in string.punctuation
+    if all(c not in v for c in string.punctuation)
 }
 BI_MAP = BI_MAP_WITHOUT_SINGLE_QUOTES
 
