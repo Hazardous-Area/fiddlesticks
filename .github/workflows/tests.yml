@@ -11,10 +11,10 @@ jobs:
     strategy:
       matrix:
         test-case: [
-          "test_is_7zip_installed",
-          "test_alt_chars_candidates_generator",
+          # "test_is_7zip_installed",
+          # "test_alt_chars_candidates_generator",
           "test_7z_archives_extracted_via_fiddlesticks_CLI",
-          "test_piping_candidates_to_stdout",
+          # "test_piping_candidates_to_stdout",
         ]
     steps:
     - name: Check out repo

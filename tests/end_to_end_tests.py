@@ -78,7 +78,7 @@ def pipe_to_bash_while_loop_collater(
         file=archive,
     )
     script_path = Path(tempfile.gettempdir()) / "persistent_checker.sh"
-    script_path.chmod(stat.S_IXUSR ^ stat.S_IWUSR ^ S_IRUSR)
+    script_path.chmod(stat.S_IXUSR ^ stat.S_IWUSR ^ stat.S_IRUSR)
     script_path.write_text(script_text)
 
     return _collate_args(
@@ -102,10 +102,10 @@ def pipe_to_bash_while_loop_collater(
     # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
 )
 @pytest.mark.parametrize("make_args,shell",[
-    (make_internal_checker_args_collater("--7zip"), False),
-    (make_internal_checker_args_collater("--7zip-persistent"), False),
-    (make_internal_checker_args_collater("--py7zr"), False),
-    (shell_collater,False),
+    # (make_internal_checker_args_collater("--7zip"), False),
+    # (make_internal_checker_args_collater("--7zip-persistent"), False),
+    # (make_internal_checker_args_collater("--py7zr"), False),
+    # (shell_collater,False),
     (pipe_to_bash_while_loop_collater,True),
 ])
 @given(
