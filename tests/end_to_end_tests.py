@@ -16,7 +16,9 @@ from .helpers import (
     _assert_candidate_within_M_of_pwd,
     _assert_files_same,
     _create_password_protected_7z_archive,
+    avdu_test_vault,
     file_names_and_contents,
+    guesses_and_num_subs_from_password,
     passwords_guesses_and_num_subs,
 )
 
@@ -207,5 +209,45 @@ def test_piping_candidates_to_stdout(
 
     assert password in candidates, f"Did not find {password=} from {guess=}, {num_subs=}, {candidates=}"
 
+# """
+# # Run using the encrypted test file. (Enter password "test" when prompted.)
+# go run ./cmd/avdu -p test/data/aegis_encrypted.json -e
+# https://github.com/Sammy-T/avdu/blob/master/README.md
+# """
+@pytest.mark.hypothesis
+@pytest.mark.slow
+@given(guess_and_num_subs=guesses_and_num_subs_from_password("test", max_num_subs=4))
+@settings(
+    max_examples=10,
+    phases=[Phase.explicit, Phase.reuse, Phase.generate],  # Skip shrinking
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
+    deadline=None,
+    # derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
+    # # (despite that the default is True in CI ???
+    # # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
+)
+def test_aegis_checker(guess_and_num_subs, avdu_test_vault):    
+    guess, num_subs = guess_and_num_subs
+    vault = avdu_test_vault()
+    result = subprocess.run(
+        _collate_args(num_subs, guess, "--aegis", str(vault)),
+        capture_output=True,
+        check=False,    
+    )
+    assert result.returncode==0, f"Using Aegis encrypted vault checker, could not find 'test' from {guess=}, {num_subs=}"
 
-
+def test_aegi_checker_errors(avdu_test_vault):
+    vault = avdu_test_vault()
+    num_subs = 4
+    guess = "abcd", # i.e. not "test" (but not too long either)
+    result = subprocess.run(
+        _collate_args(
+            num_subs,
+            guess,
+            "--aegis",
+            str(vault),
+        ),
+        capture_output=True,
+        check=False,    
+    )
+    assert result.returncode != 0, f"Failed to error on bad {guess=}, or unexpectedly found password ('test') of Aegis encrypted vault checker, {num_subs=}"

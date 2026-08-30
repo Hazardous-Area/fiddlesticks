@@ -304,6 +304,7 @@ def test_passwords_sequentially(
 
 default_password_protected_file_checker_factories = {
     ".7z" : make_7zip_checker,
+    ".json" : make_py_avdu_aegis_checker,
 }
 
 
@@ -428,6 +429,7 @@ add_checker_factory_arg("--7zip", make_7zip_checker)
 add_checker_factory_arg("--7zip-persistent", make_persistent_7zip_checker)
 add_checker_factory_arg("--shell", make_subprocess_checker)
 add_checker_factory_arg("--py7zr", make_py7zr_checker)
+add_checker_factory_arg("--aegis", make_py_avdu_aegis_checker)
 add_checker_factory_arg(
     "--pipe",
     make_password_candidate_piper,
