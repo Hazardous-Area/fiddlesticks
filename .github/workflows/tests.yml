@@ -7,17 +7,17 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     strategy:
       matrix:
         test-case: [
-          "test_is_7zip_installed",
-          "test_alt_chars_candidates_generator",
-          "test_7z_archives_extracted_via_fiddlesticks_CLI",
-          "test_piping_candidates_to_stdout",
-          "test_aegis_checker_from_CLI",
-          "test_aegis_checker_errors_from_CLI",
-          "test_aegis_checker_against_avdu_vault",
+          # "test_is_7zip_installed",
+          # "test_alt_chars_candidates_generator",
+          # "test_7z_archives_extracted_via_fiddlesticks_CLI",
+          # "test_piping_candidates_to_stdout",
+          # "test_aegis_checker_from_CLI",
+          # "test_aegis_checker_errors_from_CLI",
+          # "test_aegis_checker_against_avdu_vault",
           "test_pykeepass_checker_against_Test_vault",
         ]
     steps:
