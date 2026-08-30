@@ -2,13 +2,14 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # optional_dependencies = [
-#   tests = ["pytest", "hypothesis"],
 #   py7zr = ["py7zr"],
 #   aegis = ["py-avdu"],
+#   keepassxc = ["pykeepass"],
+#   tests = ["pytest", "hypothesis"],
 # ]
 # ///
 
-__version__ = "0.1.0.dev"
+__version__ = "0.1.1.dev"
 
 import argparse
 import atexit

@@ -12,7 +12,7 @@ of a guessed password (e.g. typos and substitutions).
 they can still recall a rough guess for their password, might only need to test 
 every candidate password that's similar enough to the guess.  
  - This may be a much faster and cheaper computation
-than the one an adversary must do, without such a guess, but in posession 
+than the one an adversary must do, without such a guess, but in possession 
 of a stolen password protected file[^0].
 
 ### Warning
@@ -39,25 +39,30 @@ archive can also do so - the password wasn't strong enough.
  (e.g. this could indicate that the starting guess was wrong).
 
  ### Design and security notes
+ *"FAQ: Why the heck should anyone in their right mind trust this with their password?"*
  - Any similar 3rd party password cracking service based on 'best guess' passwords, requires 
  the user to share the guesses for their passwords with the service.  Even if the password
  was not used for anything else, sharing even guesses for secret credentials with 3rd parties, 
  is a critical security issue.
- - Fiddlesticks is designed to minimise the need for this.  It is designed to:
-   - a) require as few dependencies as possible,
-   - b) be as easy to install as possible.  
- The intention is firstly b) assists users to run Fiddlesticks in their own secure
- environment, without requiring them to take their password guesses outside of that.  Secondly
- a) helps them decide for themselves whether or not to trust Fiddlesticks 
- in the first place, in particular whether or not it will take their password guesses outside
- of its running environment.  When the project was concieved, the intention was also to design it to:
-
-  - c) require as little code as possible
- but the code has since become somewhat more complex, mainly in order to have a nice CLI.  Simplicity and brevity should both be much more highly prized features of any software, than they are.  But you 
- be the judge of whether or not c) is still the case.
+ - Fiddlesticks is designed to minimise the need for this.  It is designed to i) be as easy 
+ to install as possible, and in particular ii) require as few dependencies as possible.  
+ Firstly, the intention of i) is to assist users to run Fiddlesticks in their own secure
+ environment, locked down as much as they want (e.g. offline and disconnected from 
+ all external network access), without requiring them to take their 
+ password guesses outside of that.  For example, for recovery of password encrypted .7z archives,
+ only a normal installation of 7zip is required on Linux (plus a close enough guess of the password!).
+ Fiddlesticks can even generate a file of candidate passwords, for external programs, and other 
+ possible applications.  Secondly, ii) helps users decide for themselves whether or not to trust Fiddlesticks 
+ in the first place.  In particular whether or not it will take their password guesses outside
+ of its running environment.  When the project was concieved, the intention was also to 
+ iii) require as little code as possible.  But the code base has since become somewhat more 
+ complex, mainly to have a nice CLI.  Simplicity and brevity should both be much 
+ more highly prized features of software in general.  But you 
+ be the judge of whether or not c) is still the case.  It's only a single ~500 line file.
 
 ### Usage
 Recommended use is simply to automate attempts to open a 7z archive via the user's own 7zip.
+Fiddlesticks can also try to decrypt Aegis vault files (for TOTP authenticators) if [py-avdu](https://pypi.org/project/py-avdu/) is also installed.
 
 There are a couple of alternative modes too, firstly: automating any other external Bash command that a candidate password can be appended to (that obeys the normal return code convention).
 
