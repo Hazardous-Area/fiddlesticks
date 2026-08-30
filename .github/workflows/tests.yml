@@ -15,10 +15,13 @@ jobs:
           "test_alt_chars_candidates_generator",
           "test_7z_archives_extracted_via_fiddlesticks_CLI",
           "test_piping_candidates_to_stdout",
+          "test_aegis_checker_from_CLI",
+          "test_aegis_checker_errors_from_CLI",
+          "test_aegis_checker_against_avdu_vault",
         ]
     steps:
     - name: Check out repo
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
     
     - name: Set up Python
       uses: actions/setup-python@v7
@@ -27,7 +30,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install -e .[tests,py7zr]
+        pip install -e .[tests,py7zr,aegis]
 
     - name: Run PyTest
       run: |

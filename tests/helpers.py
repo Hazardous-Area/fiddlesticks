@@ -1,8 +1,10 @@
 
 import string
+import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from hypothesis.strategies import (
     binary,
     composite,  # Can be slow
@@ -36,6 +38,10 @@ file_names_and_contents = lists(
 
 password_chars = set(string.ascii_letters + string.digits + string.punctuation)
 
+# We use single quotes to pass the PW guess as a Bash literal string.  
+# Otherwise much more complicated escaping rules are required.
+password_chars -= {"'"}
+
 passwords = text(
     alphabet="".join(password_chars),
     min_size=1,
@@ -61,29 +67,62 @@ def _assert_files_same(
         assert actual == content, f"File did not round trip.  Expected: {content=}.  Got: {actual=}"
 
 @composite
-def passwords_alts_and_num_subs(
+def _alts_and_num_subs_from_password(
     draw,
+    password: str,
     max_num_subs: int = 3,
     ):
-    password = draw(passwords)
 
-    indices_and_alts = []
+    all_alts = []
     for i, c in enumerate(password):
-        alts = BI_MAP.get(c)
+        alts = set(BI_MAP.get(c))
+        # To allow passing of PW guesses in single quotes via Bash, 
+        alts -= {"'"}
         if alts:
-            indices_and_alts.append((i, "".join(alts)))
+            all_alts.append((i, "".join(alts)))
 
-    num_subs = draw(integers(min_value=0, max_value=min(max_num_subs, len(indices_and_alts))))
+    num_subs = draw(integers(min_value=0, max_value=min(max_num_subs, len(all_alts))))
 
-    all_alts = draw(
+    selected_alts = draw(
         lists(
-            sampled_from(indices_and_alts),
+            sampled_from(all_alts),
             min_size=num_subs,
             max_size=num_subs,
             unique=True,
         )
     )
-    return password, all_alts, num_subs
+    return selected_alts, num_subs
+
+@composite
+def selected_alts_and_num_subs_from_password(
+    draw,
+    password: str,
+    max_num_subs: int = 3,
+    ):
+    selected_alts, num_subs = draw(_alts_and_num_subs_from_password(password, max_num_subs))
+    return selected_alts, num_subs
+
+@composite
+def guesses_from_alts(
+    draw,
+    password: str,
+    selected_alts: list[tuple[int,str]],
+    ):
+    
+    chars = list(password)
+    for i, alts in selected_alts:
+        chars[i] = draw(sampled_from(alts))
+    return "".join(chars)
+
+@composite
+def guesses_and_num_subs_from_password(
+    draw,
+    password: str,
+    max_num_subs: int = 3,
+    ):
+    selected_alts, num_subs = draw(selected_alts_and_num_subs_from_password(password, max_num_subs))
+    guess = draw(guesses_from_alts(password, selected_alts))
+    return guess, num_subs
 
 @composite
 def passwords_guesses_and_num_subs(
@@ -91,14 +130,10 @@ def passwords_guesses_and_num_subs(
     max_num_subs: int = 3,
     ):
     
-    password, all_alts, num_subs = draw(passwords_alts_and_num_subs(max_num_subs))
+    password = draw(passwords)
+    guess, num_subs = draw(guesses_and_num_subs_from_password(password, max_num_subs))
+    return password, guess, num_subs
 
-    chars = list(password)
-
-    for i, alts in all_alts:
-        chars[i] = draw(sampled_from(alts))
-
-    return password, "".join(chars), num_subs
 
 
 
@@ -111,3 +146,20 @@ def _assert_candidate_within_M_of_pwd(candidate: str, pwd: str, M: int) -> None:
             i += 1
             assert c2 in BI_MAP[c1], f"Unrelated: {c1}, {c2}"
     assert i <= M
+
+
+@pytest.fixture(scope="session")
+def avdu_test_vault(tmp_path_factory):
+    avdu_repo = tmp_path_factory.mktemp("avdu")
+    subprocess.run(
+        ["git",
+         "clone",
+         "--depth=1",
+         "https://github.com/Sammy-T/avdu/",
+         str(avdu_repo),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return avdu_repo / "test" / "data" / "aegis_encrypted.json"
+    

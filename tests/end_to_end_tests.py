@@ -1,7 +1,6 @@
 import shlex
 import shutil
 import stat
-import string
 import subprocess
 import tempfile
 from collections.abc import Callable
@@ -17,18 +16,27 @@ from .helpers import (
     _assert_candidate_within_M_of_pwd,
     _assert_files_same,
     _create_password_protected_7z_archive,
+    avdu_test_vault,
     file_names_and_contents,
+    guesses_and_num_subs_from_password,
     passwords_guesses_and_num_subs,
-    password_chars,
 )
 
 
-def _collate_args(num_subs: int, guess: str, *args: str) -> list[str]:
+def _collate_args(
+    num_subs: int,
+    guess: str,
+    *args: str,
+    shell: bool = False,
+    ) -> list[str]:
+    pwd_arg = f"--password-guess={guess}"
+    if shell:
+        pwd_arg = shlex.quote(pwd_arg)
     return [
         "fiddlesticks",
         "--max-subs", f"{num_subs}",
-        f"--password-guess={guess}",
-        *args
+        pwd_arg,
+        *args,
     ]
 
 def make_internal_checker_args_collater(
@@ -78,6 +86,7 @@ def pipe_to_bash_while_loop_collater(
         "--",
         "|",
         str(script.resolve()),
+        shell=True,
     )
 
 @pytest.mark.hypothesis
@@ -152,7 +161,7 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
 
         cmd_args = make_args(num_subs, test_extracted_dir, guess, archive)
         if shell:
-            cmd_args = " ".join(shlex.quote(arg) for arg in cmd_args)
+            cmd_args = " ".join(cmd_args)
         result = subprocess.run(
             cmd_args,
             capture_output=True,
@@ -200,5 +209,44 @@ def test_piping_candidates_to_stdout(
 
     assert password in candidates, f"Did not find {password=} from {guess=}, {num_subs=}, {candidates=}"
 
+# """
+# # Run using the encrypted test file. (Enter password "test" when prompted.)
+# go run ./cmd/avdu -p test/data/aegis_encrypted.json -e
+# https://github.com/Sammy-T/avdu/blob/master/README.md
+# """
+@pytest.mark.hypothesis
+@pytest.mark.slow
+@given(guess_and_num_subs=guesses_and_num_subs_from_password("test", max_num_subs=4))
+@settings(
+    max_examples=10,
+    phases=[Phase.explicit, Phase.reuse, Phase.generate],  # Skip shrinking
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
+    deadline=None,
+    # derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
+    # # (despite that the default is True in CI ???
+    # # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
+)
+def test_aegis_checker_from_CLI(guess_and_num_subs, avdu_test_vault):    
+    guess, num_subs = guess_and_num_subs
+    result = subprocess.run(
+        _collate_args(num_subs, guess, "--aegis", str(avdu_test_vault)),
+        capture_output=True,
+        check=False,    
+    )
+    assert result.returncode==0, f"Using Aegis encrypted vault checker, could not find 'test' from {guess=}, {num_subs=}"
 
 
+def test_aegis_checker_errors_from_CLI(avdu_test_vault):
+    num_subs = 4
+    guess = "abcd", # i.e. not "test" (but not too long either)
+    result = subprocess.run(
+        _collate_args(
+            num_subs,
+            guess,
+            "--aegis",
+            str(avdu_test_vault),
+        ),
+        capture_output=True,
+        check=False,    
+    )
+    assert result.returncode != 0, f"Failed to error on bad {guess=}, or unexpectedly found password ('test') of Aegis encrypted vault checker, {num_subs=}"
