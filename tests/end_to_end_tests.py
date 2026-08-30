@@ -195,8 +195,9 @@ def test_piping_candidates_to_stdout(
 
     candidates = set()
     for candidate in result.stdout.decode().splitlines():
-        _assert_candidate_within_M_of_pwd(shlex.split(candidate)[0], guess, M=num_subs)
-        candidates.add(candidate)
+        deescaped = shlex.split(candidate)[0]
+        _assert_candidate_within_M_of_pwd(deescaped, guess, M=num_subs)
+        candidates.add(deescaped)
 
     assert password in candidates, f"Did not find {password=} from {guess=}, {num_subs=}, {candidates=}"
 
