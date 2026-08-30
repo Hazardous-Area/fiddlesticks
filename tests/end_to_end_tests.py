@@ -1,7 +1,5 @@
-import shlex
 import shutil
 import stat
-import string
 import subprocess
 import tempfile
 from collections.abc import Callable
@@ -19,7 +17,6 @@ from .helpers import (
     _create_password_protected_7z_archive,
     file_names_and_contents,
     passwords_guesses_and_num_subs,
-    password_chars,
 )
 
 
@@ -27,7 +24,7 @@ def _collate_args(num_subs: int, guess: str, *args: str) -> list[str]:
     return [
         "fiddlesticks",
         "--max-subs", f"{num_subs}",
-        f"--password-guess={shlex.quote(guess)}",
+        f"--password-guess='{guess}'",
         *args
     ]
 
@@ -195,9 +192,8 @@ def test_piping_candidates_to_stdout(
 
     candidates = set()
     for candidate in result.stdout.decode().splitlines():
-        deescaped = shlex.split(candidate)[0]
-        _assert_candidate_within_M_of_pwd(deescaped, guess, M=num_subs)
-        candidates.add(deescaped)
+        _assert_candidate_within_M_of_pwd(candidate, guess, M=num_subs)
+        candidates.add(candidate)
 
     assert password in candidates, f"Did not find {password=} from {guess=}, {num_subs=}, {candidates=}"
 

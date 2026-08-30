@@ -36,6 +36,10 @@ file_names_and_contents = lists(
 
 password_chars = set(string.ascii_letters + string.digits + string.punctuation)
 
+# We use single quotes to pass the PW guess as a Bash literal string.  
+# Otherwise much more complicated escaping rules are required.
+password_chars -= {"'"}
+
 passwords = text(
     alphabet="".join(password_chars),
     min_size=1,
@@ -69,7 +73,9 @@ def passwords_alts_and_num_subs(
 
     indices_and_alts = []
     for i, c in enumerate(password):
-        alts = BI_MAP.get(c)
+        alts = set(BI_MAP.get(c))
+        # To passing of PW guesses in single quotes via Bash, 
+        alts -= {"'"}
         if alts:
             indices_and_alts.append((i, "".join(alts)))
 
