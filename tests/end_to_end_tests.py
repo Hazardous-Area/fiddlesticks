@@ -1,3 +1,4 @@
+import shlex
 import shutil
 import stat
 import subprocess
@@ -20,12 +21,20 @@ from .helpers import (
 )
 
 
-def _collate_args(num_subs: int, guess: str, *args: str) -> list[str]:
+def _collate_args(
+    num_subs: int,
+    guess: str,
+    *args: str,
+    shell: bool = False,
+    ) -> list[str]:
+    pwd_arg = f"--password-guess={guess}"
+    if shell:
+        pwd_arg = shlex.quote(pwd_arg)
     return [
         "fiddlesticks",
         "--max-subs", f"{num_subs}",
-        f"--password-guess={guess}",
-        *args
+        pwd_arg,
+        *args,
     ]
 
 def make_internal_checker_args_collater(
@@ -75,6 +84,7 @@ def pipe_to_bash_while_loop_collater(
         "--",
         "|",
         str(script.resolve()),
+        shell=True,
     )
 
 @pytest.mark.hypothesis
