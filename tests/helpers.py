@@ -151,6 +151,7 @@ def _assert_candidate_within_M_of_pwd(candidate: str, pwd: str, M: int) -> None:
 @pytest.fixture(scope="session")
 def avdu_test_vault(tmp_path_factory):
     avdu_repo = tmp_path_factory.mktemp("avdu")
+    avdu_repo.mkdir(exist_ok=True, parents=True)
     subprocess.run(
         f"git clone --depth=1 https://github.com/Sammy-T/avdu/ {avdu_repo}",
         check=True,
