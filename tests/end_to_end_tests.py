@@ -78,9 +78,9 @@ def pipe_to_bash_while_loop_collater(
         extract_to=str(test_extracted_dir),
         file=archive,
     )
-    script_path = Path("persistent_checker.sh")
-    script_path.write_text(script_text)
-    script_path.chmod(stat.S_IXUSR) # ^ stat.S_IWUSR ^ stat.S_IRUSR)
+    script = Path("persistent_checker.sh")
+    script.write_text(script_text)
+    script.chmod(script.stat().st_mode | stat.S_IXUSR | stat.S_IRUSR)
 
     return _collate_args(
         num_subs,
@@ -88,14 +88,14 @@ def pipe_to_bash_while_loop_collater(
         "--pipe",
         "--",
         "|",
-        str(script_path.resolve()),
+        str(script.resolve()),
     )
 
 @pytest.mark.hypothesis
 @pytest.mark.slow
 @pytest.mark.skipif(IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet")
 @settings(
-    max_examples=1,
+    max_examples=5,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
     deadline=None,
     database=None,
@@ -104,10 +104,10 @@ def pipe_to_bash_while_loop_collater(
     # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
 )
 @pytest.mark.parametrize("make_args,shell",[
-    # (make_internal_checker_args_collater("--7zip"), False),
-    # (make_internal_checker_args_collater("--7zip-persistent"), False),
-    # (make_internal_checker_args_collater("--py7zr"), False),
-    # (shell_collater,False),
+    (make_internal_checker_args_collater("--7zip"), False),
+    (make_internal_checker_args_collater("--7zip-persistent"), False),
+    (make_internal_checker_args_collater("--py7zr"), False),
+    (shell_collater,False),
     (pipe_to_bash_while_loop_collater,True),
 ])
 @given(

@@ -203,7 +203,7 @@ def make_password_candidate_piper(*args, **kwargs):
     return piper
 
 PERSISTENT_7Z_CHECKER_OUTLINE = """\
-#!/bin/bash 
+#!/usr/bin/env bash
 
 while read -r line; do
     # Silently run command, only check exit code
