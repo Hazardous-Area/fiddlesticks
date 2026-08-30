@@ -77,9 +77,9 @@ def pipe_to_bash_while_loop_collater(
         extract_to=str(test_extracted_dir),
         file=archive,
     )
-    script_path = Path(tempfile.gettempdir()) / "persistent_checker.sh"
-    script_path.chmod(stat.S_IXUSR ^ stat.S_IWUSR ^ stat.S_IRUSR)
+    script_path = Path("persistent_checker.sh")
     script_path.write_text(script_text)
+    script_path.chmod(stat.S_IXUSR) # ^ stat.S_IWUSR ^ stat.S_IRUSR)
 
     return _collate_args(
         num_subs,
