@@ -2,7 +2,9 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # optional_dependencies = [
-#   py7zr = ["py7zr",],
+#   tests = ["pytest", "hypothesis"],
+#   py7zr = ["py7zr"],
+#   aegis = ["py-avdu"],
 # ]
 # ///
 
@@ -194,19 +196,16 @@ def make_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
 
     return make_subprocess_checker("7z","x", f"-o{extract_to}", file, "-p")
 
-def make_password_candidate_piper(**kwargs):
+def make_password_candidate_piper(*args, **kwargs):
     def piper(password: str):
         print(password, file=sys.stdout)
         return False
     return piper
 
-def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
-    if extract_to is None:
-        extract_to = str(_make_new_tmp_sub_dir(file))
+PERSISTENT_7Z_CHECKER_OUTLINE = """\
+#!/usr/bin/env bash
 
-    cmd = textwrap.dedent(f"""\
-    while read -r line; do
-    
+while read -r line; do
     # Silently run command, only check exit code
     7z x -o{extract_to} {file} -p"$line" > /dev/null 2>&1
     if [ $? -eq 0 ]; then
@@ -214,8 +213,14 @@ def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwa
         break
     fi
     echo "Nope :("
-    done
-    """)
+done
+"""
+
+def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
+    if extract_to is None:
+        extract_to = str(_make_new_tmp_sub_dir(file))
+
+    cmd = textwrap.dedent(PERSISTENT_7Z_CHECKER_OUTLINE.format(extract_to=extract_to, file=file))
 
     # Launch a single persistent Bash process reading from stdin line-by-line
     proc = subprocess.Popen(
@@ -239,6 +244,27 @@ def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwa
     def cleanup():
         proc.stdin.close()
         proc.wait()
+
+    return checker
+
+
+def make_py_avdu_aegis_checker(file: str, **kwargs):
+
+    import json
+
+    from py_avdu.encrypted_classes import VaultEncrypted
+
+    vault_dict = json.loads(Path(file).read_text())
+
+    encrypted = VaultEncrypted(**vault_dict)
+
+    def checker(candidate: str) -> bool:
+        try:
+            encrypted.find_master_key(candidate)
+            return True
+        except ValueError:
+            return False
+        
 
     return checker
 
@@ -278,6 +304,7 @@ def test_passwords_sequentially(
 
 default_password_protected_file_checker_factories = {
     ".7z" : make_7zip_checker,
+    ".json" : make_py_avdu_aegis_checker,
 }
 
 
@@ -402,6 +429,7 @@ add_checker_factory_arg("--7zip", make_7zip_checker)
 add_checker_factory_arg("--7zip-persistent", make_persistent_7zip_checker)
 add_checker_factory_arg("--shell", make_subprocess_checker)
 add_checker_factory_arg("--py7zr", make_py7zr_checker)
+add_checker_factory_arg("--aegis", make_py_avdu_aegis_checker)
 add_checker_factory_arg(
     "--pipe",
     make_password_candidate_piper,
