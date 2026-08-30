@@ -2,7 +2,9 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # optional_dependencies = [
-#   py7zr = ["py7zr",],
+#   tests = ["pytest", "hypothesis"],
+#   py7zr = ["py7zr"],
+#   aegis = ["py-avdu"],
 # ]
 # ///
 
@@ -204,14 +206,13 @@ PERSISTENT_7Z_CHECKER_OUTLINE = """\
 #!/bin/bash 
 
 while read -r line; do
-
-# Silently run command, only check exit code
-7z x -o{extract_to} {file} -p"$line" > /dev/null 2>&1
-if [ $? -eq 0 ]; then
-    echo "Success! :)"
-    break
-fi
-echo "Nope :("
+    # Silently run command, only check exit code
+    7z x -o{extract_to} {file} -p"$line" > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        echo "Success! :)"
+        break
+    fi
+    echo "Nope :("
 done
 """
 
