@@ -30,7 +30,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install -e .[tests,py7zr,aegis]
+        pip install -e .[tests,py7zr,aegis,keepassxc]
 
     - name: Run PyTest
       run: |

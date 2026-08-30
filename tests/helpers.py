@@ -19,6 +19,7 @@ import fiddlesticks
 
 IS_WINDOWS = sys.platform == "win32"
 BI_MAP = fiddlesticks.SHIFT_AND_LEET_BI_MAP
+KDBX_TEST_VAULT = Path(__file__).parent / "Test_vault_Do_Not_Use.kdbx"
 
 file_names = text(
     alphabet=string.ascii_letters + string.digits,

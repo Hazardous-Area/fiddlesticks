@@ -9,7 +9,7 @@
 # ]
 # ///
 
-__version__ = "0.1.1.dev"
+__version__ = "0.2.0"
 
 import argparse
 import atexit
@@ -269,6 +269,21 @@ def make_py_avdu_aegis_checker(file: str, **kwargs):
 
     return checker
 
+def make_pykeepass_checker(file: str, **kwargs):
+
+    from pykeepass import PyKeePass
+    from pykeepass.exceptions import CredentialsError
+
+    def checker(candidate: str) -> bool:
+        try:
+            PyKeePass(file, password=candidate)
+            return True
+        except CredentialsError:
+            return False
+        
+
+    return checker
+
 
 def test_passwords_sequentially(
     candidates: Iterable[str],
@@ -431,6 +446,7 @@ add_checker_factory_arg("--7zip-persistent", make_persistent_7zip_checker)
 add_checker_factory_arg("--shell", make_subprocess_checker)
 add_checker_factory_arg("--py7zr", make_py7zr_checker)
 add_checker_factory_arg("--aegis", make_py_avdu_aegis_checker)
+add_checker_factory_arg("--keypassxc", make_pykeepass_checker)
 add_checker_factory_arg(
     "--pipe",
     make_password_candidate_piper,

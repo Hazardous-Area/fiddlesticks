@@ -16,7 +16,6 @@ from .helpers import (
     _assert_candidate_within_M_of_pwd,
     _assert_files_same,
     _create_password_protected_7z_archive,
-    avdu_test_vault,
     file_names_and_contents,
     guesses_and_num_subs_from_password,
     passwords_guesses_and_num_subs,

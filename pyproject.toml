@@ -16,9 +16,11 @@ dynamic=["version"]
 dependencies = []
 
 [project.optional-dependencies]
-tests = ["pytest", "hypothesis",]
-py7zr = ["py7zr",]
-aegis = ["py-avdu",]
+py7zr = ["py7zr"]
+aegis = ["py-avdu"]
+keepassxc = ["pykeepass"]
+tests = ["pytest", "hypothesis"]
+
 
 [project.urls]
 GitHub = "https://github.com/Hazardous-Area/fiddlesticks"

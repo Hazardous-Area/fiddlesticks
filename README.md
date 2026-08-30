@@ -62,7 +62,9 @@ archive can also do so - the password wasn't strong enough.
 
 ### Usage
 Recommended use is simply to automate attempts to open a 7z archive via the user's own 7zip.
-Fiddlesticks can also try to decrypt Aegis vault files (for TOTP authenticators) if [py-avdu](https://pypi.org/project/py-avdu/) is also installed.
+Fiddlesticks can also try to decrypt KeepassXC vaults and Aegis vault files (for TOTP authenticators) if 
+[pykeepass](https://pypi.org/project/pykeepass/) and [py-avdu](https://pypi.org/project/py-avdu/) respectively, are 
+also installed.
 
 There are a couple of alternative modes too, firstly: automating any other external Bash command that a candidate password can be appended to (that obeys the normal return code convention).
 
