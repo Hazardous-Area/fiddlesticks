@@ -29,13 +29,6 @@ jobs:
       run: |
         pip install -e .[tests,py7zr]
 
-    - name: Get external test data
-      uses: actions/checkout@v7
-      with:
-        repository: Sammy-T/avdu/
-        ref: a7d5f12318ede0a016b0560b93d3ec1a7a22dda7 # First commit
-        path: avdu
-
     - name: Run PyTest
       run: |
         pytest -k ${{ matrix.test-case }}
