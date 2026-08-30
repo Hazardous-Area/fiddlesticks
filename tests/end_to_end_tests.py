@@ -235,7 +235,7 @@ def test_aegis_checker_from_CLI(guess_and_num_subs, avdu_test_vault):
     )
     assert result.returncode==0, f"Using Aegis encrypted vault checker, could not find 'test' from {guess=}, {num_subs=}"
 
-def test_aegi_checker_errors_from_CLI(avdu_test_vault):
+def test_aegis_checker_errors_from_CLI(avdu_test_vault):
     num_subs = 4
     guess = "abcd", # i.e. not "test" (but not too long either)
     result = subprocess.run(
