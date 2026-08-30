@@ -19,4 +19,4 @@ def test_is_7zip_installed():
 def test_aegis_checker_against_avdu_vault(avdu_test_vault):
     checker = make_py_avdu_aegis_checker(avdu_test_vault)
     assert checker("test")
-    assert checker("not_test")
+    assert not checker("not_test")
