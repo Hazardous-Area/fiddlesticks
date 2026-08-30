@@ -73,7 +73,8 @@ def pipe_to_bash_while_loop_collater(
 
     script_text = fiddlesticks.PERSISTENT_7Z_CHECKER_OUTLINE.format(
         extract_to=str(test_extracted_dir),
-        file=archive)
+        file=archive,
+    )
     script_path = Path(tempfile.gettempdir()) / "persistent_checker.sh"
     script_path.write_text(script_text)
     return _collate_args(
@@ -146,7 +147,6 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
             ["7z", "x", f"-p{password}", f"-o{test_extracted_dir}", archive],
             capture_output=True,
             check=False,
-            shell=shell,
         )
         assert result.returncode == 0, f"Could not extract {archive} with known good: {password=}, with 7z directly"
 
@@ -155,11 +155,14 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
         shutil.rmtree(test_extracted_dir)
         test_extracted_dir.mkdir()
 
-
+        cmd_args = make_args(num_subs, test_extracted_dir, guess, archive)
+        if shell:
+            cmd_args = " ".join(cmd_args)
         result = subprocess.run(
-            make_args(num_subs, test_extracted_dir, guess, archive),
+            cmd_args,
             capture_output=True,
             check=False,
+            shell=shell,
         )
         assert result.returncode==0, f"Could not crack: {password} from: {guess=} for {archive}, {num_subs=}"
 

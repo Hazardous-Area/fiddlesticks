@@ -201,17 +201,19 @@ def make_password_candidate_piper(**kwargs):
     return piper
 
 PERSISTENT_7Z_CHECKER_OUTLINE = """\
-    while read -r line; do
-    
-    # Silently run command, only check exit code
-    7z x -o{extract_to} {file} -p"$line" > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        echo "Success! :)"
-        break
-    fi
-    echo "Nope :("
-    done
-    """
+#!/bin/bash 
+
+while read -r line; do
+
+# Silently run command, only check exit code
+7z x -o{extract_to} {file} -p"$line" > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "Success! :)"
+    break
+fi
+echo "Nope :("
+done
+"""
 
 def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
     if extract_to is None:
