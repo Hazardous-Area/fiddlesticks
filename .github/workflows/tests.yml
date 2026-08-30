@@ -31,4 +31,4 @@ jobs:
     
     - name: Run PyTest
       run: |
-        pytest -k ${{ matrix.test-case }}
+        pytest -k -vvv ${{ matrix.test-case }}

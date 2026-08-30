@@ -98,6 +98,7 @@ def pipe_to_bash_while_loop_collater(
     max_examples=1,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
     deadline=None,
+    database=None,
     derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
     # (despite that the default is True in CI ???
     # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
