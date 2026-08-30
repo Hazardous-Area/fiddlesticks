@@ -1,1 +1,3 @@
 * text eol=lf
+*.kdbx binary
+*.kdbx -text -diff
