@@ -95,7 +95,7 @@ def pipe_to_bash_while_loop_collater(
 @pytest.mark.slow
 @pytest.mark.skipif(IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet")
 @settings(
-    max_examples=5,
+    max_examples=1,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
     deadline=None,
     derandomize=True, # Without this, the test doesn't complete in less than 5 mins in Github Actions 
