@@ -248,9 +248,12 @@ def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwa
 
 
 def make_py_avdu_aegis_checker(file: str, **kwargs):
+
+    import json
+
     from py_avdu.encrypted_classes import VaultEncrypted
 
-    vault_dict = json.loads(pathlib.Path(file).read_text())
+    vault_dict = json.loads(Path(file).read_text())
 
     encrypted = VaultEncrypted(**vault_dict)
 

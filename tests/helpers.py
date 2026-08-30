@@ -3,7 +3,6 @@ import string
 import sys
 from pathlib import Path
 
-import fiddlesticks
 from hypothesis.strategies import (
     binary,
     composite,  # Can be slow
@@ -13,6 +12,8 @@ from hypothesis.strategies import (
     text,
     tuples,
 )
+
+import fiddlesticks
 
 IS_WINDOWS = sys.platform == "win32"
 BI_MAP = fiddlesticks.SHIFT_AND_LEET_BI_MAP

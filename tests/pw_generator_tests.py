@@ -1,7 +1,8 @@
 
-import fiddlesticks
 import pytest
 from hypothesis import HealthCheck, given, settings
+
+import fiddlesticks
 
 from .helpers import (
     _assert_candidate_within_M_of_pwd,

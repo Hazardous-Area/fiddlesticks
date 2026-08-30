@@ -1,12 +1,14 @@
 import shutil
+import stat
 import subprocess
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-import fiddlesticks
 import pytest
 from hypothesis import HealthCheck, Phase, given, settings
+
+import fiddlesticks
 
 from .helpers import (
     IS_WINDOWS,
@@ -77,6 +79,7 @@ def pipe_to_bash_while_loop_collater(
     )
     script_path = Path(tempfile.gettempdir()) / "persistent_checker.sh"
     script_path.write_text(script_text)
+    script_path.chmod(stat.S_IXUSR)
     return _collate_args(
         num_subs,
         guess,
