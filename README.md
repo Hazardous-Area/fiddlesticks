@@ -2,6 +2,8 @@
 *"Aaaagh!  I forgot my 7zip password"* - James (more times than he cares to remember).
 ![Tests passing](https://github.com/Hazardous-Area/fiddlesticks/actions/workflows/tests.yml/badge.svg)
 
+Version 0.2.0 
+
 ## Description
 Password recovery tool, for password-encrypted files, using simple off-line brute 
 force attacks.  Password candidates are generated, using common variations 
@@ -58,7 +60,7 @@ archive can also do so - the password wasn't strong enough.
  iii) require as little code as possible.  But the code base has since become somewhat more 
  complex, mainly to have a nice CLI.  Simplicity and brevity should both be much 
  more highly prized features of software in general.  But you 
- be the judge of whether or not c) is still the case.  It's only a single ~500 line file.
+ be the judge of whether or not c) is still the case.  The application code is all in a 526 line file.
 
 ### Usage
 Recommended use is simply to automate attempts to open a 7z archive via the user's own 7zip.
