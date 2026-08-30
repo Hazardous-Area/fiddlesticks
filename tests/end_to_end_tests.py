@@ -27,7 +27,7 @@ def _collate_args(num_subs: int, guess: str, *args: str) -> list[str]:
     return [
         "fiddlesticks",
         "--max-subs", f"{num_subs}",
-        f"--password-guess={guess}",
+        f"--password-guess={shlex.quote(guess)}",
         *args
     ]
 
@@ -152,7 +152,7 @@ def test_7z_archives_extracted_via_fiddlesticks_CLI(
 
         cmd_args = make_args(num_subs, test_extracted_dir, guess, archive)
         if shell:
-            cmd_args = " ".join(shlex.quote(arg) for arg in cmd_args)
+            cmd_args = " ".join(cmd_args)
         result = subprocess.run(
             cmd_args,
             capture_output=True,
