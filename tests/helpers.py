@@ -1,4 +1,3 @@
-
 import string
 import subprocess
 import sys
@@ -39,7 +38,7 @@ file_names_and_contents = lists(
 
 password_chars = set(string.ascii_letters + string.digits + string.punctuation)
 
-# We use single quotes to pass the PW guess as a Bash literal string.  
+# We use single quotes to pass the PW guess as a Bash literal string.
 # Otherwise much more complicated escaping rules are required.
 password_chars -= {"'"}
 
@@ -59,25 +58,29 @@ def _create_password_protected_7z_archive(
     for file_name, content in file_names_and_contents:
         (dir_ / file_name).write_bytes(content)
 
+
 def _assert_files_same(
     dir_: Path,
     file_names_and_contents: list[tuple[str, bytes]],
 ):
     for file_name, content in file_names_and_contents:
         actual = (dir_ / file_name).read_bytes()
-        assert actual == content, f"File did not round trip.  Expected: {content=}.  Got: {actual=}"
+        assert actual == content, (
+            f"File did not round trip.  Expected: {content=}.  Got: {actual=}"
+        )
+
 
 @composite
 def _alts_and_num_subs_from_password(
     draw,
     password: str,
     max_num_subs: int = 3,
-    ):
+):
 
     all_alts = []
     for i, c in enumerate(password):
-        alts = set(BI_MAP.get(c))
-        # To allow passing of PW guesses in single quotes via Bash, 
+        alts = set(BI_MAP.get(c, []))
+        # To allow passing of PW guesses in single quotes via Bash,
         alts -= {"'"}
         if alts:
             all_alts.append((i, "".join(alts)))
@@ -94,48 +97,54 @@ def _alts_and_num_subs_from_password(
     )
     return selected_alts, num_subs
 
+
 @composite
 def selected_alts_and_num_subs_from_password(
     draw,
     password: str,
     max_num_subs: int = 3,
-    ):
-    selected_alts, num_subs = draw(_alts_and_num_subs_from_password(password, max_num_subs))
+):
+    selected_alts, num_subs = draw(
+        _alts_and_num_subs_from_password(password, max_num_subs)
+    )
     return selected_alts, num_subs
+
 
 @composite
 def guesses_from_alts(
     draw,
     password: str,
-    selected_alts: list[tuple[int,str]],
-    ):
-    
+    selected_alts: list[tuple[int, str]],
+):
+
     chars = list(password)
     for i, alts in selected_alts:
         chars[i] = draw(sampled_from(alts))
     return "".join(chars)
+
 
 @composite
 def guesses_and_num_subs_from_password(
     draw,
     password: str,
     max_num_subs: int = 3,
-    ):
-    selected_alts, num_subs = draw(selected_alts_and_num_subs_from_password(password, max_num_subs))
+):
+    selected_alts, num_subs = draw(
+        selected_alts_and_num_subs_from_password(password, max_num_subs)
+    )
     guess = draw(guesses_from_alts(password, selected_alts))
     return guess, num_subs
+
 
 @composite
 def passwords_guesses_and_num_subs(
     draw,
     max_num_subs: int = 3,
-    ):
-    
+):
+
     password = draw(passwords)
     guess, num_subs = draw(guesses_and_num_subs_from_password(password, max_num_subs))
     return password, guess, num_subs
-
-
 
 
 def _assert_candidate_within_M_of_pwd(candidate: str, pwd: str, M: int) -> None:
@@ -153,14 +162,14 @@ def _assert_candidate_within_M_of_pwd(candidate: str, pwd: str, M: int) -> None:
 def avdu_test_vault(tmp_path_factory):
     avdu_repo = tmp_path_factory.mktemp("avdu")
     subprocess.run(
-        ["git",
-         "clone",
-         "--depth=1",
-         "https://github.com/Sammy-T/avdu/",
-         str(avdu_repo),
+        [
+            "git",
+            "clone",
+            "--depth=1",
+            "https://github.com/Sammy-T/avdu/",
+            str(avdu_repo),
         ],
         check=True,
         capture_output=True,
     )
     return avdu_repo / "test" / "data" / "aegis_encrypted.json"
-    

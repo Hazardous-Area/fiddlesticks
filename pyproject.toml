@@ -20,7 +20,7 @@ py7zr = ["py7zr"]
 aegis = ["py-avdu"]
 keepassxc = ["pykeepass"]
 tests = ["pytest", "hypothesis"]
-dev = ["ruff",]
+dev = ["ruff","ty"]
 
 
 [project.urls]
