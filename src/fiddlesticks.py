@@ -9,7 +9,7 @@
 # ]
 # ///
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 import argparse
 import atexit
@@ -326,7 +326,7 @@ default_password_protected_file_checker_factories = {
 }
 
 
-def default_checker_factory(*args: str, **kwargs):
+def _default_factory_selector(*args: str):
     if not args:
         raise ValueError(
             "Default checker requires arg(s) to define how to test the passwords"
@@ -335,25 +335,20 @@ def default_checker_factory(*args: str, **kwargs):
     path = Path(args[0])
 
     if path.is_file():
-        return default_password_protected_file_checker_factories[path.suffix.lower()](*args)
+        return default_password_protected_file_checker_factories[path.suffix.lower()]
     
-    return make_subprocess_checker(*args)
+    return make_subprocess_checker
 
 
 def try_find_password_sequentially(
-    extras: list[str],
-    password_guess: str | None = None,
+    checker: Callable[[str], bool],
+    password_guess: str,
     max_subs: int = 2,
-    checker_factory: Callable[[str], Callable[[str], bool]] = make_subprocess_checker,
-    extract_to: str | None = None,
     password_generator: Callable[[str, int], tuple[int | None, Iterator[str]]] = candidate_passwords_from_alt_chars,
     alt_char_map: dict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
     **kwargs,
 ) -> tuple[str, int] | None:
 
-    checker = checker_factory(*extras, extract_to=extract_to)
-    if password_guess is None:
-        password_guess = getpass.getpass("Input password guess: ")
     total, candidates = password_generator(guess=password_guess, max_subs=max_subs, alt_char_map=alt_char_map)
     return test_passwords_sequentially(candidates, checker, total=total, **kwargs)
 
@@ -416,7 +411,7 @@ parser.add_argument(
 )
 
 parser.set_defaults(
-    checker_factory=default_checker_factory,
+    checker_factory=None,
     password_generator=candidate_passwords_from_alt_chars,
     alt_char_map=SHIFT_AND_LEET_BI_MAP,
 )
@@ -484,27 +479,54 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         parser.print_help()
         return 0
 
-    namespace = parser.parse_args()
+    ns = parser.parse_args()
+    kwargs = vars(ns).copy()
+    password_guess = kwargs.pop("password_guess", None)
 
-    if namespace.password_guess is not None:
+    if password_guess is None:
+        password_guess = getpass.getpass("Input password guess: ")
+    else:
         warnings.warn(
             "Password guess given on command line may be stored in history. "
-            "After this program ends, you may wish to delete the latest entry, "
+            "After this program ends, you may wish to delete the latest history entry, "
             "e.g. by running: history -d $(history 1 | awk '{print $1}')"
         )
     
-    kwargs = vars(namespace).copy()
 
     output_file = kwargs.pop("output_file")
+    extras = kwargs.pop("extras")
+    extract_to = kwargs.pop("extract_to")
 
+    if ns.checker_factory is None:
+        checker_factory = _default_factory_selector(*extras)
+    else:
+        checker_factory = ns.checker_factory
+
+    if ((checker_factory is make_py_avdu_aegis_checker or 
+        checker_factory is make_pykeepass_checker) and
+        not ns.print_passwords and not output_file and ns.verbosity==0):
+        warnings.warn(
+            "The Keepass and the Aegis vault checkers do not decrypt files. "
+            "When running fiddlesticks without print-passwords, without "
+            "an output-file, and with verbosity=0, only the candidate number "
+            "of any recovered password will be printed. "
+        )
+
+    checker = checker_factory(*extras, extract_to=extract_to)
+
+    
     t0 = time.time()
 
-    result = try_find_password_sequentially(**kwargs)
+    result = try_find_password_sequentially(
+        password_guess = password_guess,
+        checker = checker,
+        **kwargs,
+    )
 
     t1 = time.time()
 
     if result is None:
-        if namespace.checker_factory is make_password_candidate_piper:
+        if ns.checker_factory is make_password_candidate_piper:
             return 0
 
         print_to_stderr("\n\nCould not find password. Try a different guess, or increasing max substitutions (-N) ? ")
@@ -515,7 +537,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
     msg = f"\n Found password (guess number: {i}) in {t1-t0:.3f} seconds"
     print_to_stderr(msg, end="")
 
-    print_to_stderr(f" {password=}" if namespace.print_passwords else "")
+    print_to_stderr(f" {password=}" if ns.print_passwords else "")
 
     if output_file:
         with open(output_file, "at") as f:

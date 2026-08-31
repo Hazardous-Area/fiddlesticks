@@ -20,6 +20,7 @@ py7zr = ["py7zr"]
 aegis = ["py-avdu"]
 keepassxc = ["pykeepass"]
 tests = ["pytest", "hypothesis"]
+dev = ["ruff",]
 
 
 [project.urls]
@@ -34,7 +35,6 @@ sources = {"src" = ""}  # move from "src" directory for wheel
 
 [tool.hatch.version]
 path = "src/fiddlesticks.py" 
-
 
 [tool.pytest.ini_options]
 markers = [

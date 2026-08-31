@@ -13,10 +13,10 @@ import fiddlesticks
 
 from .helpers import (
     IS_WINDOWS,
-    avdu_test_vault,
     _assert_candidate_within_M_of_pwd,
     _assert_files_same,
     _create_password_protected_7z_archive,
+    avdu_test_vault,  # noqa: F401
     file_names_and_contents,
     guesses_and_num_subs_from_password,
     passwords_guesses_and_num_subs,
@@ -226,7 +226,7 @@ def test_piping_candidates_to_stdout(
     # # (despite that the default is True in CI ???
     # # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
 )
-def test_aegis_checker_from_CLI(guess_and_num_subs, avdu_test_vault):    
+def test_aegis_checker_from_CLI(guess_and_num_subs, avdu_test_vault): # noqa: F811
     guess, num_subs = guess_and_num_subs
     result = subprocess.run(
         _collate_args(num_subs, guess, "--aegis", str(avdu_test_vault)),
@@ -236,7 +236,7 @@ def test_aegis_checker_from_CLI(guess_and_num_subs, avdu_test_vault):
     assert result.returncode==0, f"Using Aegis encrypted vault checker, could not find 'test' from {guess=}, {num_subs=}"
 
 
-def test_aegis_checker_errors_from_CLI(avdu_test_vault):
+def test_aegis_checker_errors_from_CLI(avdu_test_vault): # noqa: F811
     num_subs = 4
     guess = "abcd", # i.e. not "test" (but not too long either)
     result = subprocess.run(
