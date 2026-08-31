@@ -13,21 +13,43 @@ authors = [
 ]
 requires-python = ">=3.12"
 dynamic=["version"]
+
 dependencies = []
-
-[project.optional-dependencies]
-py7zr = ["py7zr"]
-aegis = ["py-avdu"]
-keepassxc = ["pykeepass"]
-tests = ["pytest", "hypothesis"]
-dev = ["ruff","ty"]
-
 
 [project.urls]
 GitHub = "https://github.com/Hazardous-Area/fiddlesticks"
 
 [project.scripts]
 fiddlesticks = "fiddlesticks:cli"
+
+[project.optional-dependencies]
+py7zr = [
+    "py7zr",
+]
+aegis = [
+    "py-avdu",
+]
+keepassxc = [
+    "pykeepass",
+]
+
+[dependency-groups]
+dev = [
+    {include-group = "lint"},
+    {include-group = "test"},
+]
+test = [
+    "fiddlesticks[py7zr,aegis,keepassxc]",
+    "pytest",
+    "hypothesis",
+]
+lint = [
+    "ruff",
+    "ty",
+    "pre-commit",
+]
+
+
 
 [tool.hatch.build.targets.wheel]
 only-include = ["src"]

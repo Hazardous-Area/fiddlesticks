@@ -1,3 +1,4 @@
+import json
 import shlex
 import shutil
 import stat
@@ -12,6 +13,7 @@ from hypothesis import HealthCheck, Phase, given, settings
 import fiddlesticks
 
 from .helpers import (
+    BI_MAP,
     IS_WINDOWS,
     _assert_candidate_within_M_of_pwd,
     _assert_files_same,
@@ -274,4 +276,52 @@ def test_aegis_checker_errors_from_CLI(avdu_test_vault):  # noqa: F811
     )
     assert result.returncode != 0, (
         f"Failed to error on bad {guess=}, or unexpectedly found password ('test') of Aegis encrypted vault checker, {num_subs=}"
+    )
+
+
+def test_print_alt_char_map_is_valid_JSON():
+    result = subprocess.run(
+        ["fiddlesticks", "--print-char-map", "--shift_and_leet"],
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, "Error when printing alt char map"
+    assert json.loads(result.stderr.decode()) == BI_MAP
+
+
+@pytest.mark.parametrize(
+    "guess,num_subs,mapping",
+    [
+        (
+            "AB",
+            2,
+            {
+                "A": ["Y"],
+                "B": ["Z"],
+            },
+        ),
+    ],
+)
+def test_piping_candidates_from_alt_char_map(
+    guess: str, num_subs: int, mapping: dict[str, list[str]], tmp_path
+):
+    mapping_file = tmp_path / "test.json"
+    mapping_file.write_text(json.dumps(mapping))
+    result = subprocess.run(
+        _collate_args(num_subs, guess, "--pipe", f"--char-map={mapping_file}"),
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, (
+        f"Could not --pipe candidate passwords, {num_subs=}, {guess=}, {mapping_file=}"
+    )
+
+    candidates = set()
+    for candidate in result.stdout.decode().splitlines():
+        _assert_candidate_within_M_of_pwd(candidate, guess, M=num_subs, mapping=mapping)
+        candidates.add(candidate)
+
+    expected = {"AB", "AZ", "YB", "YZ"}
+    assert candidates == expected, (
+        f"Missing, or unexpected candidates in {candidates}.  Expected: {expected}"
     )

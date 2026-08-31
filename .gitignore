@@ -11,3 +11,7 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Dev environment lock file
+# (to avoid confusion with possible application lock files)
+uv.lock

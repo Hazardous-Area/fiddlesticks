@@ -147,14 +147,19 @@ def passwords_guesses_and_num_subs(
     return password, guess, num_subs
 
 
-def _assert_candidate_within_M_of_pwd(candidate: str, pwd: str, M: int) -> None:
+def _assert_candidate_within_M_of_pwd(
+    candidate: str,
+    pwd: str,
+    M: int,
+    mapping: dict[str, list[str]] = BI_MAP,
+) -> None:
     # Current implementation preserves length
     assert len(pwd) == len(candidate)
     i = 0
     for c1, c2 in zip(pwd, candidate):
         if c1 != c2:
             i += 1
-            assert c2 in BI_MAP[c1], f"Unrelated: {c1}, {c2}"
+            assert c2 in mapping[c1], f"Unrelated: {c1}, {c2}"
     assert i <= M
 
 

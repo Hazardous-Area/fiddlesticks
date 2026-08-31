@@ -17,11 +17,10 @@ __version__ = "0.2.1.dev"
 
 import argparse
 import atexit
-from collections import defaultdict
-from collections.abc import Callable, Iterable, Iterator
 import getpass
 import io
 import itertools
+import json
 import os
 import string
 import subprocess
@@ -29,14 +28,16 @@ import sys
 import tempfile
 import textwrap
 import time
-from typing import cast
 import warnings
+from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
+from typing import cast
 
 TMP_DIR = Path(tempfile.gettempdir()) / "fiddlesticks"
 TMP_DIR.mkdir(exist_ok=True)
 
-SHIFT_MAP: dict[str,str] = {
+SHIFT_MAP: dict[str, str] = {
     "1": "!",
     "2": '@"',
     "3": "#£",
@@ -64,7 +65,7 @@ SHIFT_MAP: dict[str,str] = {
 for c in string.ascii_lowercase:
     SHIFT_MAP[c] = c.upper()
 
-LEET_SPEAK: dict[str,str] = {
+LEET_SPEAK: dict[str, str] = {
     "a": "4@",
     "e": "3",
     "i": "1",
@@ -114,38 +115,68 @@ def _combine_maps(
 SHIFT_AND_LEET_BI_MAP = _combine_maps([SHIFT_MAP, LEET_SPEAK])
 
 
-def candidate_passwords_from_alt_chars(
+def _candidates_from_num_subs(
     guess: str,
+    num_subs: int,
+    alts: list[list[str]],
+) -> Iterator[tuple[str, int]]:
+    if num_subs == 0:
+        yield guess, 0
+        return
+    for positions in itertools.combinations(range(len(guess)), num_subs):
+        alts_at_positions = [alts[i] for i in positions if alts[i]]
+
+        if len(alts_at_positions) != num_subs:
+            continue
+
+        for selected in itertools.product(*alts_at_positions):
+            candidate_password = list(guess)
+            for i, replacement in zip(positions, selected):
+                candidate_password[i] = replacement
+            yield "".join(candidate_password), num_subs
+
+
+def candidate_passwords_from_alt_chars(
+    guesses: list[str],
     max_subs: int = 2,
-    alt_chars: list[list[str]] | None = None,
+    alt_chars: list[list[list[str]]] | None = None,
     alt_char_map: dict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
 ) -> tuple[int, Iterator[tuple[str, int]]]:
 
-    alts: list[list[str]]
-    alts = [alt_char_map[c] for c in guess] if alt_chars is None else alt_chars
+    overrides = [None for guess in guesses] if alt_chars is None else alt_chars
+    guesses_alts: dict[str, list[list[str]]]
+    guesses_alts = {
+        # In case alt_char_map[c] is a str
+        guess: [list(alt_char_map[c]) for c in guess] if alts is None else alts
+        for guess, alts in zip(guesses, overrides)
+    }
 
-    lengths = [len(chars) for chars in alts]
-    total_num_candidates = sum(
-        _calculate_total(lengths, M) for M in range(1, max_subs + 1)
-    )
+    total_num_candidates = 0
+    for alts in guesses_alts.values():
+        lengths = [len(chars) for chars in alts]
+        total_num_candidates += sum(
+            _calculate_total(lengths, M) for M in range(1, max_subs + 1)
+        )
 
     def generator():
-        yield guess, 0
-
-        for num_subs in range(1, max_subs + 1):
-            for positions in itertools.combinations(range(len(guess)), num_subs):
-                pos_with_opts = [alts[i] for i in positions if alts[i]]
-
-                if len(pos_with_opts) != num_subs:
-                    continue
-
-                choices_per_pos = [opts for opts in pos_with_opts]
-
-                for selected in itertools.product(*choices_per_pos):
-                    candidate_password = list(guess)
-                    for i, replacement in zip(positions, selected):
-                        candidate_password[i] = replacement
-                    yield "".join(candidate_password), num_subs
+        for num_subs in range(max_subs + 1):
+            # Yield candidates derived from each guess using
+            # Round robin order.
+            iterators = [
+                _candidates_from_num_subs(guess, num_subs, alts)
+                for guess, alts in guesses_alts.items()
+            ]
+            while iterators:
+                for i, iterator in itertools.cycle(enumerate(iterators)):
+                    # More itertools just uses a next call with
+                    # no fallback value, to break out by raising
+                    # StopIteration
+                    candidate = next(iterator, None)
+                    if candidate is None:
+                        break
+                    yield candidate
+                # Get rid of exhausted iterator
+                iterators.pop(i)
 
     return total_num_candidates, generator()
 
@@ -161,7 +192,7 @@ def make_py7zr_checker(archive: str, extract_to: str | None = None, **kwargs):
     else:
         exceptions += (_lzma.LZMAError,)
     if extract_to is None:
-        extract_to = str(_make_new_tmp_sub_dir(archive)) 
+        extract_to = str(_make_new_tmp_sub_dir(archive))
     stream = io.BytesIO(Path(archive).read_bytes())
 
     def is_correct_password_for_7z_file(candidate: str) -> bool:
@@ -278,8 +309,6 @@ def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwa
 
 def make_py_avdu_aegis_checker(file: str, **kwargs):
 
-    import json
-
     from py_avdu.encrypted_classes import VaultEncrypted
 
     vault_dict = json.loads(Path(file).read_text())
@@ -326,7 +355,7 @@ def test_passwords_sequentially(
     if update_every is None and total is not None:
         update_every = max(1, total // 300)
     else:
-        update_every = 40 
+        update_every = 40
     if verbosity >= 1:
         update_every = min(update_every, 1000)
 
@@ -382,7 +411,7 @@ def _default_factory_selector(*args: str):
 
 
 parser = argparse.ArgumentParser()
-parser.suggest_on_error = True # type: ignore
+parser.suggest_on_error = True  # type: ignore
 parser.add_argument(
     "--max-subs",
     "-N",
@@ -425,12 +454,20 @@ parser.add_argument(
 parser.add_argument(
     "--password-guess",
     "-p",
-    default=None,
+    action="append",
+    dest="password_guesses",
     help=(
-        "WARNING! If given on the command line, its value may be saved by your shell "
+        "WARNING! Password guesses given on the command line may be saved by your shell, "
         "and e.g. appear in the Bash history file.  Otherwise, you will be prompted to "
-        " securely enter this before the search can begin. "
+        "securely enter the guess(es) before the search can begin. "
     ),
+)
+parser.add_argument(
+    "--input-file",
+    "-i",
+    required=False,
+    type=Path,
+    help="Optional file of password guesses. ",
 )
 parser.add_argument(
     "--extract-to",
@@ -456,9 +493,9 @@ parser.add_argument(
 )
 
 parser.set_defaults(
-    checker_factory=None,
+    command=None,
     password_generator=candidate_passwords_from_alt_chars,
-    alt_char_map=SHIFT_AND_LEET_BI_MAP,
+    alt_char_map=None,
 )
 
 
@@ -472,28 +509,34 @@ def add_mutex_group(
     return mutex_arg_group
 
 
-checker_factories_group = add_mutex_group(
-    "Password checker", "The method (if any) used to test candidate passwords."
+command_args_group = add_mutex_group(
+    "Sub-command",
+    (
+        "The sub-commmand (if any), e.g. the Password checker to use to test candidates. "
+        "If not set, the sub-command is inferred from the file extension "
+        "of any archive file (if present). "
+        "Otherwise a partial external shell command is expected, to which candidates can be appended. "
+    ),
 )
 
 
-def add_checker_factory_arg(name, checker_factory, help: str | None = None):
-    checker_factories_group.add_argument(
+def add_command_arg(name, command, help: str | None = None):
+    command_args_group.add_argument(
         name,
-        dest="checker_factory",
+        dest="command",
         action="store_const",
-        const=checker_factory,
+        const=command,
         help=help,
     )
 
 
-add_checker_factory_arg("--7zip", make_7zip_checker)
-add_checker_factory_arg("--7zip-persistent", make_persistent_7zip_checker)
-add_checker_factory_arg("--shell", make_subprocess_checker)
-add_checker_factory_arg("--py7zr", make_py7zr_checker)
-add_checker_factory_arg("--aegis", make_py_avdu_aegis_checker)
-add_checker_factory_arg("--keypassxc", make_pykeepass_checker)
-add_checker_factory_arg(
+add_command_arg("--7zip", make_7zip_checker)
+add_command_arg("--7zip-persistent", make_persistent_7zip_checker)
+add_command_arg("--shell", make_subprocess_checker)
+add_command_arg("--py7zr", make_py7zr_checker)
+add_command_arg("--aegis", make_py_avdu_aegis_checker)
+add_command_arg("--keypassxc", make_pykeepass_checker)
+add_command_arg(
     "--pipe",
     make_password_candidate_piper,
     help=(
@@ -502,6 +545,8 @@ add_checker_factory_arg(
         "Overrides --print-passwords. "
     ),
 )
+add_command_arg("--print-char-map", "print-char-map")
+
 
 alt_char_map_group = add_mutex_group(
     "Character map",
@@ -511,18 +556,21 @@ alt_char_map_group = add_mutex_group(
     ),
 )
 
+alt_char_map_group.add_argument(
+    "--shift_and_leet",
+    dest="alt_char_map",
+    action="store_const",
+    const=SHIFT_AND_LEET_BI_MAP,
+)
 
-def add_alt_char_map_arg(name, alt_char_map, help: str | None = None):
-    alt_char_map_group.add_argument(
-        name,
-        dest="alt_char_map",
-        action="store_const",
-        const=alt_char_map,
-        help=help,
-    )
-
-
-add_alt_char_map_arg("--shift_and_leet", SHIFT_AND_LEET_BI_MAP)
+alt_char_map_group.add_argument(
+    "--char-map",
+    type=Path,
+    help=(
+        "A JSON file containing a mapping of characters "
+        "(length 1 strings) to alternative characters."
+    ),
+)
 
 
 def cli(args: list[str] = sys.argv[1:]) -> int:
@@ -533,31 +581,55 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
 
     ns = parser.parse_args()
     kwargs = vars(ns).copy()
-    password_guess = kwargs.pop("password_guess", None)
 
-    if password_guess is None:
-        password_guess = getpass.getpass("Input password guess: ")
+    if ns.alt_char_map is None:
+        if ns.char_map is not None:
+            alt_char_map = json.loads(ns.char_map.read_text())
+        else:
+            alt_char_map = SHIFT_AND_LEET_BI_MAP
+    else:
+        alt_char_map = ns.alt_char_map
+
+    if ns.command == "print-char-map":
+        # Prettified JSON, without adding a new line for each item in an array
+        # (unlike json.dumps(..., indent = 4))
+        items = iter(alt_char_map.items())
+        k, v = next(items)
+        print_to_stderr("{" + f"{json.dumps(k)}: {json.dumps(v)}", end="")
+        for k, v in items:
+            print_to_stderr(f",\n {json.dumps(k)}: {json.dumps(v)}", end="")
+        print_to_stderr("\n}")
+        return 0
+
+    password_guesses = kwargs.pop("password_guesses", [])
+
+    if not password_guesses:
+        while password_guess := getpass.getpass(
+            "Input password guess (or press Enter when done): "
+        ):
+            password_guesses.append(password_guess)
     else:
         warnings.warn(
-            "Password guess given on command line may be stored in history. "
+            "Password guesses given on command line may be stored in history. "
             "After this program ends, you may wish to delete the latest history entry, "
             "e.g. by running: history -d $(history 1 | awk '{print $1}')"
         )
+
+    input_file = kwargs.pop("input_file", None)
+    if input_file is not None:
+        password_guesses.extend(input_file.read_text().splitlines())
 
     output_file = kwargs.pop("output_file")
     extras = kwargs.pop("extras")
     extract_to = kwargs.pop("extract_to")
 
-    if ns.checker_factory is None:
-        checker_factory = _default_factory_selector(*extras)
+    if ns.command is None:
+        command = _default_factory_selector(*extras)
     else:
-        checker_factory = ns.checker_factory
+        command = ns.command
 
     if (
-        (
-            checker_factory is make_py_avdu_aegis_checker
-            or checker_factory is make_pykeepass_checker
-        )
+        (command is make_py_avdu_aegis_checker or command is make_pykeepass_checker)
         and not ns.print_passwords
         and not output_file
         and ns.verbosity == 0
@@ -570,9 +642,9 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         )
 
     total, candidates = ns.password_generator(
-        guess=password_guess, max_subs=ns.max_subs, alt_char_map=ns.alt_char_map
+        guesses=password_guesses, max_subs=ns.max_subs, alt_char_map=alt_char_map
     )
-    checker = checker_factory(*extras, extract_to=extract_to)
+    checker = command(*extras, extract_to=extract_to)
 
     t0 = time.time()
 
@@ -581,7 +653,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
     t1 = time.time()
 
     if result is None:
-        if ns.checker_factory is make_password_candidate_piper:
+        if ns.command is make_password_candidate_piper:
             return 0
 
         print_to_stderr(
@@ -597,7 +669,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
 
     if output_file:
         with open(output_file, "at") as f:
-            f.write(f"{msg}, {password=}")
+            f.write(f"{password}\n")
     return 0
 
 
