@@ -42,6 +42,8 @@ test = [
     "fiddlesticks[py7zr,aegis,keepassxc]",
     "pytest",
     "hypothesis",
+    "coverage>=7.13",
+    "covdefaults",
 ]
 lint = [
     "ruff",
@@ -65,3 +67,10 @@ markers = [
 ]
 python_files = "test_*.py *_test.py *_tests.py"
 
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+patch = ["subprocess"]
+plugins = [
+    "covdefaults",
+]

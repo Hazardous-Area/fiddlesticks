@@ -1,6 +1,5 @@
 import string
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -16,9 +15,10 @@ from hypothesis.strategies import (
 
 import fiddlesticks
 
-IS_WINDOWS = sys.platform == "win32"
 BI_MAP = fiddlesticks.SHIFT_AND_LEET_BI_MAP
-KDBX_TEST_VAULT = Path(__file__).parent / "Test_vault_Do_Not_Use.kdbx"
+PARENT_DIR = Path(__file__).parent
+KDBX_TEST_VAULT = PARENT_DIR / "Test_vault_Do_Not_Use.kdbx"
+SEVEN_ZIP_TEST_ARCHIVE = PARENT_DIR / "foo.7z"
 
 file_names = text(
     alphabet=string.ascii_letters + string.digits,
@@ -36,17 +36,21 @@ file_names_and_contents = lists(
     unique_by=lambda x: x[0],
 )
 
-password_chars = set(string.ascii_letters + string.digits + string.punctuation)
-
+base_password_chars = set(string.ascii_letters + string.digits + string.punctuation)
+BASH_CONTROL_CHARS = set("'&:$;|<>()\\ \".*{}?[]#!~-=")
 # We use single quotes to pass the PW guess as a Bash literal string.
 # Otherwise much more complicated escaping rules are required.
-password_chars -= {"'"}
+chars_without_Bash_syntax = base_password_chars - BASH_CONTROL_CHARS
 
-passwords = text(
-    alphabet="".join(password_chars),
-    min_size=1,
-    max_size=40,
-)
+
+def passwords(
+    password_chars: set[str] = base_password_chars,
+):
+    return text(
+        alphabet="".join(password_chars),
+        min_size=1,
+        max_size=40,
+    )
 
 
 def _create_password_protected_7z_archive(
@@ -75,13 +79,12 @@ def _alts_and_num_subs_from_password(
     draw,
     password: str,
     max_num_subs: int = 3,
+    password_chars: set[str] = base_password_chars,
 ):
 
     all_alts = []
     for i, c in enumerate(password):
-        alts = set(BI_MAP.get(c, []))
-        # To allow passing of PW guesses in single quotes via Bash,
-        alts -= {"'"}
+        alts = {alt for alt in BI_MAP.get(c, []) if alt in password_chars}
         if alts:
             all_alts.append((i, "".join(alts)))
 
@@ -94,18 +97,6 @@ def _alts_and_num_subs_from_password(
             max_size=num_subs,
             unique=True,
         )
-    )
-    return selected_alts, num_subs
-
-
-@composite
-def selected_alts_and_num_subs_from_password(
-    draw,
-    password: str,
-    max_num_subs: int = 3,
-):
-    selected_alts, num_subs = draw(
-        _alts_and_num_subs_from_password(password, max_num_subs)
     )
     return selected_alts, num_subs
 
@@ -128,9 +119,10 @@ def guesses_and_num_subs_from_password(
     draw,
     password: str,
     max_num_subs: int = 3,
+    password_chars: set[str] = base_password_chars,
 ):
     selected_alts, num_subs = draw(
-        selected_alts_and_num_subs_from_password(password, max_num_subs)
+        _alts_and_num_subs_from_password(password, max_num_subs, password_chars)
     )
     guess = draw(guesses_from_alts(password, selected_alts))
     return guess, num_subs
@@ -140,27 +132,45 @@ def guesses_and_num_subs_from_password(
 def passwords_guesses_and_num_subs(
     draw,
     max_num_subs: int = 3,
+    password_chars: set[str] = base_password_chars,
 ):
 
-    password = draw(passwords)
-    guess, num_subs = draw(guesses_and_num_subs_from_password(password, max_num_subs))
+    password = draw(passwords(password_chars))
+    guess, num_subs = draw(
+        guesses_and_num_subs_from_password(password, max_num_subs, password_chars)
+    )
     return password, guess, num_subs
 
 
-def _assert_candidate_within_M_of_pwd(
+def _candidate_is_within_M_of_pwd(
     candidate: str,
     pwd: str,
     M: int,
     mapping: dict[str, list[str]] = BI_MAP,
-) -> None:
+) -> bool:
     # Current implementation preserves length
-    assert len(pwd) == len(candidate)
-    i = 0
+    if len(pwd) != len(candidate):
+        return False
+
+    num_subs = 0
     for c1, c2 in zip(pwd, candidate):
         if c1 != c2:
-            i += 1
-            assert c2 in mapping[c1], f"Unrelated: {c1}, {c2}"
-    assert i <= M
+            num_subs += 1
+            if c2 not in mapping[c1]:
+                return False
+
+    return num_subs <= M
+
+
+def _assert_candidate_within_M_of_pwds(
+    candidate: str,
+    pwds: list[str],
+    M: int,
+    mapping: dict[str, list[str]] = BI_MAP,
+) -> None:
+    assert any(
+        _candidate_is_within_M_of_pwd(candidate, pwd, M, mapping) for pwd in pwds
+    )
 
 
 @pytest.fixture(scope="session")
