@@ -9,7 +9,7 @@
 # ]
 # ///
 
-__version__ = "0.2.1"
+__version__ = "0.2.1.dev"
 
 import argparse
 import atexit
@@ -111,7 +111,7 @@ def candidate_passwords_from_alt_chars(
     max_subs: int = 2,
     alt_chars: list[list[str]] | None = None,
     alt_char_map: dict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
-    ) -> tuple[int, Iterator[str]]:
+    ) -> tuple[int, Iterator[tuple[str, int]]]:
     
 
     alt_chars = alt_chars or [alt_char_map[c] for c in guess]
@@ -120,7 +120,7 @@ def candidate_passwords_from_alt_chars(
     total_num_candidates = sum(_calculate_total(lengths, M) for M in range(1, max_subs+1))
     
     def generator():
-        yield guess
+        yield guess, 0
 
         for num_subs in range(1, max_subs + 1):
 
@@ -138,7 +138,7 @@ def candidate_passwords_from_alt_chars(
                     candidate_password = list(guess)
                     for i, replacement in zip(positions, selected):
                         candidate_password[i] = replacement
-                    yield ''.join(candidate_password)
+                    yield ''.join(candidate_password), num_subs
 
     return total_num_candidates, generator()
 
@@ -286,7 +286,7 @@ def make_pykeepass_checker(file: str, **kwargs):
 
 
 def test_passwords_sequentially(
-    candidates: Iterable[str],
+    candidates: Iterable[tuple[str, int]],
     test_func: Callable[[str], bool],
     verbosity: int = 0,
     update_every: int | None = None,
@@ -302,7 +302,8 @@ def test_passwords_sequentially(
     if verbosity >= 1:
         update_every = min(update_every, 1000)
 
-    for i, candidate in enumerate(candidates, start=1):
+    last_printed_num_subs = 0
+    for i, (candidate, num_subs) in enumerate(candidates, start=1):
         if test_func(candidate):
             return candidate, i
 
@@ -310,10 +311,16 @@ def test_passwords_sequentially(
             continue
         if verbosity == 0:
             print_to_stderr(".", end="", flush=True)
+            # If testing multiple guesses at the same time, the current
+            # number of substitutions for each might not be synchronised.
+            if num_subs > last_printed_num_subs:
+                print_to_stderr(f"Now testing candidates formed by {num_subs} substitutions from guess")
+                last_printed_num_subs = num_subs
         elif verbosity >= 2 and print_passwords:
-            print_to_stderr(f"{i}{out_of_total}) tried: {candidate}", flush=True)
+            print_to_stderr(f"{i}{out_of_total}) tried: {candidate} (num substitutions={num_subs})", flush=True)
         else:
-            print_to_stderr(f"{i}{out_of_total}", flush=True)
+            print_to_stderr(f"{i}{out_of_total}, num substitutions={num_subs}", flush=True)
+        
 
     return None
 
@@ -344,7 +351,7 @@ def try_find_password_sequentially(
     checker: Callable[[str], bool],
     password_guess: str,
     max_subs: int = 2,
-    password_generator: Callable[[str, int], tuple[int | None, Iterator[str]]] = candidate_passwords_from_alt_chars,
+    password_generator: Callable[[str, int], tuple[int | None, Iterator[tuple[str, int]]]] = candidate_passwords_from_alt_chars,
     alt_char_map: dict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
     **kwargs,
 ) -> tuple[str, int] | None:
@@ -366,6 +373,16 @@ parser.add_argument(
     ),
 )
 parser.add_argument('--verbosity', '-v', action='count', default=0)
+parser.add_argument(
+    "--update-every",
+    "-V",
+    type=int,
+    default=None,
+    help=(
+        "How many candidates to test before printing an update message "
+        "to stderr (no effect without -v). "
+    ),
+)
 parser.add_argument(
     '--output-file',
     '-o',

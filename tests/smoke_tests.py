@@ -1,6 +1,10 @@
-from fiddlesticks import candidate_passwords_from_alt_chars as candidates
+from fiddlesticks import candidate_passwords_from_alt_chars
 
 
 def smoke_test():
-    guesses = set(candidates("password123", max_subs=2))
+    candidates = candidate_passwords_from_alt_chars(
+        "password123",
+        max_subs=2,
+    )
+    guesses = {candidate for candidate, _num_subs in candidates}
     assert 'password12£' in guesses

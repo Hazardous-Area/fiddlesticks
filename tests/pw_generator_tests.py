@@ -20,5 +20,5 @@ from .helpers import (
 def test_alt_chars_candidates_generator(password_guess_and_num_subs: tuple[str,list[tuple[int,str]],int]):
     pwd, _guesses, M = password_guess_and_num_subs
     _total, candidates = fiddlesticks.candidate_passwords_from_alt_chars(pwd, M)
-    for candidate in candidates:
+    for candidate, _num_subs in candidates:
         _assert_candidate_within_M_of_pwd(candidate, pwd, M)
