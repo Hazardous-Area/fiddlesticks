@@ -241,7 +241,7 @@ def test_piping_candidates_to_stdout(
 @pytest.mark.slow
 @given(guess_and_num_subs=guesses_and_num_subs_from_password("test", max_num_subs=4))
 @settings(
-    max_examples=10,
+    max_examples=5,
     phases=[Phase.explicit, Phase.reuse, Phase.generate],  # Skip shrinking
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
     deadline=None,

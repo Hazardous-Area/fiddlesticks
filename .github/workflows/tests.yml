@@ -8,20 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        test-case: [
-          "test_is_7zip_installed",
-          "test_alt_chars_candidates_generator",
-          "test_7z_archives_extracted_via_fiddlesticks_CLI",
-          "test_piping_candidates_to_stdout",
-          "test_aegis_checker_from_CLI",
-          "test_aegis_checker_errors_from_CLI",
-          "test_aegis_checker_against_avdu_vault",
-          "test_pykeepass_checker_against_Test_vault",
-          "test_print_alt_char_map_is_valid_JSON",
-          "test_piping_candidates_from_alt_char_map",
-        ]
+
     steps:
     - name: Check out repo
       uses: actions/checkout@v7
@@ -37,4 +24,4 @@ jobs:
 
     - name: Run PyTest
       run: |
-        pytest -k ${{ matrix.test-case }}
+        pytest -rA --tb=short

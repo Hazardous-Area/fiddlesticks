@@ -3,17 +3,15 @@
 # dependencies = []
 # ///
 
-# # Non-compliant:
+# # Non-compliant with PEP 723:
 # optional_dependencies = [
 #   py7zr = ["py7zr"],
 #   aegis = ["py-avdu"],
 #   keepassxc = ["pykeepass"],
-#   tests = ["pytest", "hypothesis"],
-#   dev = ["ruff","ty",]
 # ]
 # ///
 
-__version__ = "0.2.1.dev"
+__version__ = "0.3.0"
 
 import argparse
 import atexit

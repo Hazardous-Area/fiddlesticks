@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fiddlesticks"
-description = "Password recovery tool for encrypted archives (currently only .7z files supported)."
+description = "Password recovery tool for encrypted files (.7z archives .kdbx files, and Aegis archives)."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
