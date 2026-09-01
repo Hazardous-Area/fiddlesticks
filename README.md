@@ -8,7 +8,9 @@ Version 0.3.0
 ## Description
 Password recovery tool, for password-encrypted files, using simple off-line brute 
 force attacks.  Password candidates are generated, using common variations 
-of a guessed password (e.g. typos and substitutions).  
+of a guessed password (e.g. typos and substitutions).  .7z, .kdbx and Aegis archives 
+are directly supported, but Fiddlesticks can also call any shell command, that accepts 
+a candidate password.
 
 ### Raison d'etre
  - Password-protected file owners recovering their own password themselves, as long as 
@@ -23,7 +25,7 @@ Strictly speaking, Fiddlesticks is a password-protected file recovery tool.  Use
 get your files back.  But once you've found a password that protected those files via Fiddlesticks
 (or any third party tool) it should not be used again.  Anywhere else it is also used, the 
 password should be reset (or the files re-encrypted with a different one).  By default,
-Fiddlesticks does not print the password it finds (or any candidates) unless `-P` or `-v` is set 
+Fiddlesticks does not print the password it finds (or any candidates) unless `-P` is set 
 (or if using `--pipe` with no pipe).
 
 ### "Back of envelope" sketch 'calculation'
@@ -102,7 +104,8 @@ also installed.
 
 There are a couple of alternative modes too, 
 
- - firstly: automating any partial external Bash command that a candidate password can be appended to (that obeys the normal return code convention).  Specify `--shell` or by default if the partial command is specified after `--`.
+ - firstly: automating any partial external Bash command that a candidate password can be appended to (that exits with return code 0
+for the correct password, otherwise some non-zero exit code).  Specify `--shell` or by default if the partial command is specified after `--`.
 
 Secondly with `--pipe` candidate passwords can be sent to stdout, from where they can be piped to stdin of a user's own external program or code (all the normal output from fiddlesticks goes to stderr).
 
@@ -125,10 +128,12 @@ the number of substitutions required for each candidate can be capped by setting
 
 #### Output control & verbosity
 If a file is specified in `--output-file` or `-o` Fiddlesticks will write a successfully found 
-password to it.  Fiddlesticks does not print any candidate passwords by default (on successfully finding a password, the
-candidate number is printed; candidate generation is deterministic), unless:
- - `--print-passwords` or `-P` is set, or
- - `-vv` is set (or `--verbosity --verbosity` or `--verbosity -v`, if you really want to).
+password to it.  Unless `-P` or `--print-passwords` is set, Fiddlesticks does not print any 
+candidate passwords by default (on successfully finding a password, the
+candidate number is printed; candidate generation is deterministic).
+The number of output messages (printed to stderr) can be increased by raising 
+the verbosity, by setting `-v` or `--verbosity`, once or twice (e.g. `-vv`).
+"Two" is the maximum verbosity available. 
 
 ### Custom alternative character maps
 

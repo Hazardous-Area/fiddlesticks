@@ -1,12 +1,20 @@
+import stat
 import subprocess
 
 import pytest
 
-from fiddlesticks import make_py_avdu_aegis_checker, make_pykeepass_checker
+from fiddlesticks import (
+    IS_WINDOWS,
+    _make_new_tmp_sub_dir,
+    check_passwords_sequentially,
+    make_py_avdu_aegis_checker,
+    make_pykeepass_checker,
+    make_subprocess_checker,
+)
 
 from .helpers import (
-    IS_WINDOWS,
     KDBX_TEST_VAULT,
+    SEVEN_ZIP_TEST_ARCHIVE,
     avdu_test_vault,  # noqa: F401
 )
 
@@ -16,7 +24,7 @@ from .helpers import (
 )
 def test_is_7zip_installed():
     args = ["7z", "--help"]
-    subprocess.check_call(args)
+    subprocess.run(args, capture_output=True, check=True)
 
 
 def test_aegis_checker_against_avdu_vault(avdu_test_vault):  # noqa: F811
@@ -34,3 +42,34 @@ def test_pykeepass_checker_against_Test_vault():
     checker = make_pykeepass_checker(KDBX_TEST_VAULT)
     assert checker("test")
     assert not checker("wrong_password")
+
+
+def test_make_new_tmp_sub_dir(tmp_path, capsys):
+    _make_new_tmp_sub_dir("", tmp_path)
+    # repeat to test while loop, and append a suffix.
+    _make_new_tmp_sub_dir("", tmp_path)
+
+
+def test_make_subprocess_checker(tmp_path):
+    script = tmp_path / "extract_with_7z.sh"
+    script.write_text(f"""\
+#!/usr/bin/env bash
+set -eu
+
+7z x -p$1 -o{tmp_path} {SEVEN_ZIP_TEST_ARCHIVE}
+""")
+    script.chmod(script.stat().st_mode | stat.S_IXUSR | stat.S_IRUSR)
+    checker = make_subprocess_checker(f"{script} ")
+    assert checker("test")
+
+
+def test_sequential_passwords_checker_verbosity_2(capsys):
+    result = check_passwords_sequentially(
+        candidates=[("A", 0), ("B", 0), ("C", 0)],
+        test_func=lambda candidate: False,
+        verbosity=2,
+        update_every=1,
+        total=3,
+        print_passwords=True,
+    )
+    assert result is None

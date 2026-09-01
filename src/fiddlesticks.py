@@ -34,6 +34,8 @@ from typing import cast
 
 TMP_DIR = Path(tempfile.gettempdir()) / "fiddlesticks"
 TMP_DIR.mkdir(exist_ok=True)
+IS_WINDOWS = sys.platform == "win32"
+
 
 SHIFT_MAP: dict[str, str] = {
     "1": "!",
@@ -134,11 +136,39 @@ def _candidates_from_num_subs(
             yield "".join(candidate_password), num_subs
 
 
+def _candidates_from_alts_dict(
+    guesses_alts: dict[str, list[list[str]]],
+    max_subs: int,
+) -> Iterator[tuple[str, int]]:
+    for num_subs in range(max_subs + 1):
+        # Yield candidates derived from each guess using
+        # a not quite Round robin order (that restarts
+        # from the earliest iterator after one is exhausted).
+        iterators = [
+            _candidates_from_num_subs(guess, num_subs, alts)
+            for guess, alts in guesses_alts.items()
+        ]
+        while iterators:
+            # Coverage would like to see tests covering iterators being empty,
+            # which is not reachable within a while iterators: loop.
+            for i, iterator in itertools.cycle(
+                enumerate(iterators)
+            ):  # pragma: no branch
+                # More itertools' roundrobin just breaks out of the loop
+                # using a next call with no fallback value, to raise StopIteration
+                candidate = next(iterator, None)
+                if candidate is None:
+                    break
+                yield candidate
+            # Get rid of exhausted iterator
+            iterators.pop(i)
+
+
 def candidate_passwords_from_alt_chars(
     guesses: list[str],
     max_subs: int = 2,
     alt_chars: list[list[list[str]]] | None = None,
-    alt_char_map: dict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
+    alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
 ) -> tuple[int, Iterator[tuple[str, int]]]:
 
     overrides = [None for guess in guesses] if alt_chars is None else alt_chars
@@ -153,42 +183,18 @@ def candidate_passwords_from_alt_chars(
     for alts in guesses_alts.values():
         lengths = [len(chars) for chars in alts]
         total_num_candidates += sum(
-            _calculate_total(lengths, M) for M in range(1, max_subs + 1)
+            _calculate_total(lengths, M) for M in range(max_subs + 1)
         )
 
-    def generator():
-        for num_subs in range(max_subs + 1):
-            # Yield candidates derived from each guess using
-            # Round robin order.
-            iterators = [
-                _candidates_from_num_subs(guess, num_subs, alts)
-                for guess, alts in guesses_alts.items()
-            ]
-            while iterators:
-                for i, iterator in itertools.cycle(enumerate(iterators)):
-                    # More itertools just uses a next call with
-                    # no fallback value, to break out by raising
-                    # StopIteration
-                    candidate = next(iterator, None)
-                    if candidate is None:
-                        break
-                    yield candidate
-                # Get rid of exhausted iterator
-                iterators.pop(i)
-
-    return total_num_candidates, generator()
+    return total_num_candidates, _candidates_from_alts_dict(guesses_alts, max_subs)
 
 
 def make_py7zr_checker(archive: str, extract_to: str | None = None, **kwargs):
-    import py7zr
+    from _lzma import LZMAError
 
-    exceptions = (py7zr.exceptions.PasswordRequired, py7zr.exceptions.Bad7zFile)
-    try:
-        import _lzma
-    except ImportError:
-        pass
-    else:
-        exceptions += (_lzma.LZMAError,)
+    import py7zr
+    from py7zr.exceptions import Bad7zFile, PasswordRequired
+
     if extract_to is None:
         extract_to = str(_make_new_tmp_sub_dir(archive))
     stream = io.BytesIO(Path(archive).read_bytes())
@@ -198,7 +204,7 @@ def make_py7zr_checker(archive: str, extract_to: str | None = None, **kwargs):
         try:
             f = py7zr.SevenZipFile(stream, "r", password=candidate)
             f.extractall(path=extract_to)
-        except exceptions:
+        except (PasswordRequired, Bad7zFile, LZMAError):
             return False
         f.close()
         return True
@@ -207,21 +213,35 @@ def make_py7zr_checker(archive: str, extract_to: str | None = None, **kwargs):
 
 
 def make_subprocess_checker(*args: str, **kwargs):
-    *rest, last = args
 
-    def is_correct_password(candidate: str) -> bool:
+    # If args[-1][-1] = " ", it will get escaped
+    # and quoted together with the appended password.
+    # Interpreting that space as a Bash word separator
+    # requires shell=True.
+    # On the other hand, if last == "-p", e.g. with 7z,
+    # the password is expected with no space separating it
+    # from the -p.
+    # Therefore to stick with out contract of "any partial
+    # Bash command to which a password guess can be appended"
+    # it's easiest to use a single string,
+    # and (unless on Windows) shell=True
+
+    def checker(candidate: str) -> bool:
         result = subprocess.run(
-            [*rest, f"{last}{candidate}"], capture_output=True, check=False
+            f"{' '.join(args)}{candidate}",
+            capture_output=True,
+            check=False,
+            shell=not IS_WINDOWS,
         )
         return result.returncode == 0
 
-    return is_correct_password
+    return checker
 
 
-def _make_new_tmp_sub_dir(file: str) -> Path:
+def _make_new_tmp_sub_dir(file: str, tmp_dir: Path = TMP_DIR) -> Path:
     i = -1
     suffix = ""
-    while (p := TMP_DIR / f"extracted{suffix}").is_dir():
+    while (p := tmp_dir / f"extracted{suffix}").is_dir():
         i += 1
         suffix = f"_{i}"
     p.mkdir()
@@ -229,15 +249,10 @@ def _make_new_tmp_sub_dir(file: str) -> Path:
     return p
 
 
-class ProgramNotFound(Exception):
-    pass
-
-
 def make_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
-    args = ["7z", "--help"]
-    result = subprocess.run(args, capture_output=True, check=False)
-    if result.returncode != 0:
-        raise ProgramNotFound(f"7zip.  Args: {args}")
+
+    # Ensure we can run 7zip in a subprocess.
+    subprocess.run(["7z", "--help"], capture_output=True, check=True)
 
     if extract_to is None:
         extract_to = str(_make_new_tmp_sub_dir(file))
@@ -338,7 +353,7 @@ def make_pykeepass_checker(file: os.PathLike, **kwargs):
     return checker
 
 
-def test_passwords_sequentially(
+def check_passwords_sequentially(
     candidates: Iterable[tuple[str, int]],
     test_func: Callable[[str], bool],
     verbosity: int = 0,
@@ -350,10 +365,9 @@ def test_passwords_sequentially(
 
     out_of_total = "" if total is None else f"/{total}"
 
-    if update_every is None and total is not None:
-        update_every = max(1, total // 300)
-    else:
-        update_every = 40
+    if update_every is None:
+        update_every = 40 if total is None else max(1, total // 300)
+
     if verbosity >= 1:
         update_every = min(update_every, 1000)
 
@@ -402,13 +416,13 @@ def _default_factory_selector(*args: str):
 
     path = Path(args[0])
 
-    if path.is_file():
+    if len(args) == 1 and path.is_file():
         return default_password_protected_file_checker_factories[path.suffix.lower()]
 
     return make_subprocess_checker
 
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(prog="fiddlesticks")
 parser.suggest_on_error = True  # type: ignore
 parser.add_argument(
     "--max-subs",
@@ -454,6 +468,7 @@ parser.add_argument(
     "-p",
     action="append",
     dest="password_guesses",
+    default=[],
     help=(
         "WARNING! Password guesses given on the command line may be saved by your shell, "
         "and e.g. appear in the Bash history file.  Otherwise, you will be prompted to "
@@ -574,15 +589,17 @@ alt_char_map_group.add_argument(
 def cli(args: list[str] = sys.argv[1:]) -> int:
 
     if not args:
-        parser.print_help()
+        parser.print_help(file=sys.stderr)
         return 0
 
-    ns = parser.parse_args()
+    ns = parser.parse_args(args)
     kwargs = vars(ns).copy()
 
+    alt_char_map: defaultdict[str, list[str]]
     if ns.alt_char_map is None:
         if ns.char_map is not None:
-            alt_char_map = json.loads(ns.char_map.read_text())
+            alt_char_map = defaultdict(list)
+            alt_char_map.update(json.loads(ns.char_map.read_text()))
         else:
             alt_char_map = SHIFT_AND_LEET_BI_MAP
     else:
@@ -601,12 +618,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
 
     password_guesses = kwargs.pop("password_guesses", [])
 
-    if not password_guesses:
-        while password_guess := getpass.getpass(
-            "Input password guess (or press Enter when done): "
-        ):
-            password_guesses.append(password_guess)
-    else:
+    if password_guesses:
         warnings.warn(
             "Password guesses given on command line may be stored in history. "
             "After this program ends, you may wish to delete the latest history entry, "
@@ -616,6 +628,12 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
     input_file = kwargs.pop("input_file", None)
     if input_file is not None:
         password_guesses.extend(input_file.read_text().splitlines())
+
+    if not password_guesses:
+        while password_guess := getpass.getpass(
+            "Input password guess (or press Enter when done): "
+        ):
+            password_guesses.append(password_guess)
 
     output_file = kwargs.pop("output_file")
     extras = kwargs.pop("extras")
@@ -646,7 +664,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
 
     t0 = time.time()
 
-    result = test_passwords_sequentially(candidates, checker, total=total, **kwargs)
+    result = check_passwords_sequentially(candidates, checker, total=total, **kwargs)
 
     t1 = time.time()
 
@@ -667,7 +685,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
 
     if output_file:
         with open(output_file, "at") as f:
-            f.write(f"{password}\n")
+            f.write(f"{password}")
     return 0
 
 
