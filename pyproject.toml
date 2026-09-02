@@ -23,14 +23,18 @@ GitHub = "https://github.com/Hazardous-Area/fiddlesticks"
 fiddlesticks = "fiddlesticks:cli"
 
 [project.optional-dependencies]
-py7zr = [
-    "py7zr",
+ssh = [
+    "cryptography>=47", # For incorrect PW error message from Rust code
+    "bcrypt",
+]
+keepassxc = [
+    "pykeepass",
 ]
 aegis = [
     "py-avdu",
 ]
-keepassxc = [
-    "pykeepass",
+py7zr = [
+    "py7zr",
 ]
 
 [dependency-groups]
@@ -39,7 +43,7 @@ dev = [
     {include-group = "test"},
 ]
 test = [
-    "fiddlesticks[py7zr,aegis,keepassxc]",
+    "fiddlesticks[ssh,keepassxc,aegis,py7zr]",
     "pytest",
     "hypothesis",
     "coverage>=7.13",

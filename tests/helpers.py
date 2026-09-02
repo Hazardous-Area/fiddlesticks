@@ -188,3 +188,55 @@ def avdu_test_vault(tmp_path_factory):
         capture_output=True,
     )
     return avdu_repo / "test" / "data" / "aegis_encrypted.json"
+
+
+def _try_make_key_files(keys_dir: Path, password: str = "") -> list[tuple[Path, str]]:
+    keyfiles_and_pwds = []
+    for cmd, pwd, key_file in [
+        (
+            'openssl genrsa -aes128 -passout pass:{password} -out "{key_file}" 2048',
+            "test",
+            "openssl_PEM.key",
+        ),
+        (
+            'ssh-keygen -m PEM -t rsa -b 2048 -N "{password}" -f "{key_file}"',
+            "testtest",
+            "basic_PEM.key",
+        ),
+        (
+            'ssh-keygen -t rsa -b 2048 -N "{password}" -f "{key_file}"',
+            "testtest",
+            "openssh-modern.key",
+        ),
+    ]:
+        pwd = password or pwd
+        subprocess.run(
+            cmd.format(password=pwd, key_file=(keys_dir / key_file).as_posix()),
+            check=True,
+            capture_output=True,
+            shell=True,
+        )
+        keyfiles_and_pwds.append((keys_dir / key_file, pwd))
+    return keyfiles_and_pwds
+
+
+@pytest.fixture(scope="session")
+def ssh_test_keys(tmp_path_factory) -> list[tuple[Path, str]]:
+    keys_dir = tmp_path_factory.mktemp("test_ssh_keys_DO_NOT_USE")
+    return _try_make_key_files(keys_dir)
+
+
+def _assert_output_on_found_password(
+    password: str,
+    i: int,
+    print_passwords: bool,
+    stdout: str,
+    stderr: str,
+) -> None:
+    assert not stdout
+    assert "Found password" in stderr, f"{stderr=}"
+    assert f"candidate number: {i}" in stderr, f"{stderr=}"
+    if print_passwords:
+        assert password in stderr, f"{stderr=}"
+    else:
+        assert password not in stderr, f"{stderr=}"

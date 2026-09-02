@@ -1,12 +1,9 @@
-from unittest.mock import patch
-
 import pytest
 from hypothesis import HealthCheck, given, settings
 
 import fiddlesticks
 
 from .helpers import (
-    SEVEN_ZIP_TEST_ARCHIVE,
     _assert_candidate_within_M_of_pwds,
     _candidate_is_within_M_of_pwd,
     passwords_guesses_and_num_subs,
@@ -56,11 +53,3 @@ def test_multiple_guesses(pwds):
     _total, candidates = fiddlesticks.candidate_passwords_from_alt_chars(pwds, 2)
     for candidate, _num_subs in candidates:
         _assert_candidate_within_M_of_pwds(candidate, pwds, 2)
-
-
-@pytest.mark.skipif(
-    fiddlesticks.IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet"
-)
-def test_password_from_getpass_in_CLI(capsys):
-    with patch("getpass.getpass", side_effect=["test", ""]):
-        assert 0 == fiddlesticks.cli(["--max-subs", "0", str(SEVEN_ZIP_TEST_ARCHIVE)])
