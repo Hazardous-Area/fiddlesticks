@@ -11,7 +11,7 @@
 # ]
 # ///
 
-__version__ = "0.3.0"
+__version__ = "0.4.0.dev"
 
 import argparse
 import atexit
@@ -80,11 +80,11 @@ for c, v in list(LEET_SPEAK.items()):
     LEET_SPEAK[c.upper()] = v
 
 
-def print_to_stderr(*objects, file=sys.stderr, **kwargs):
+def print_to_stderr(*objects, **kwargs):
     """Simple wrapper to print to stderr instead of stdout,
-    for easy piping to stdout.
+    for easy piping (of other output) to stdout.
     """
-    print(*objects, file=file, **kwargs)
+    print(*objects, file=sys.stderr, **kwargs)
 
 
 def _calculate_total(lengths, M):
@@ -187,6 +187,26 @@ def candidate_passwords_from_alt_chars(
         )
 
     return total_num_candidates, _candidates_from_alts_dict(guesses_alts, max_subs)
+
+
+def possibly_output_found_password(
+    password: str,
+    i: int,
+    t: float | None = None,
+    print_passwords: bool = False,
+    output_file: str = "",
+    **kwargs,
+):
+    msg = f"\n Found password (candidate number: {i})"
+    if t is not None:
+        msg = f"{msg} in {t:.3f} seconds"
+    print_to_stderr(msg, end="")
+
+    print_to_stderr(f" {password=}" if print_passwords else "")
+
+    if output_file:
+        with open(output_file, "at") as f:
+            f.write(password)
 
 
 def make_py7zr_checker(archive: str, extract_to: str | None = None, **kwargs):
@@ -353,6 +373,103 @@ def make_pykeepass_checker(file: os.PathLike, **kwargs):
     return checker
 
 
+def _get_hopefully_incorrect_password() -> str:
+    try:
+        return getpass.getuser()
+    except OSError:
+        return "password123"
+
+
+def _try_make_ssh_key_checker_from_loader(
+    loader,
+    incorrect_password_msg: str,
+    file: os.PathLike,
+    **kwargs,
+) -> Callable[[str], bool]:
+
+    private_key_data = Path(file).read_bytes()
+    hopefully_incorrect_password = _get_hopefully_incorrect_password()
+    try:
+        loader(private_key_data, password=hopefully_incorrect_password.encode())
+        possibly_output_found_password(
+            hopefully_incorrect_password,
+            i=-12345,
+            t=None,
+            **kwargs,
+        )
+        sys.exit(0)
+    except ValueError as e:
+        if e.args[0] != incorrect_password_msg:
+            raise
+
+    def checker(candidate: str) -> bool:
+        try:
+            loader(
+                private_key_data,
+                password=candidate.encode(),
+                # Fail fast.  Key pair validation is out of scope
+                # (but on success we do it anyway to give the user a heads up).
+                # https://cryptography.io/en/latest/hazmat/primitives/asymmetric/serialization/#cryptography.hazmat.primitives.serialization.load_ssh_private_key
+                unsafe_skip_rsa_key_validation=True,
+            )
+        except ValueError:
+            return False
+        loader(
+            private_key_data,
+            password=candidate.encode(),
+            # Validate key pair, only once we already know
+            # we have the correct password.
+            unsafe_skip_rsa_key_validation=False,
+        )
+        return True
+
+    return checker
+
+
+def make_ssh_key_checker(file: os.PathLike, **kwargs):
+
+    exceptions = []
+
+    for factory in [
+        make_openSSH_key_checker,
+        make_ssh_pem_key_checker,
+    ]:
+        try:
+            return factory(file, **kwargs)
+        except ValueError as e:
+            exceptions.append(e)
+
+    raise ExceptionGroup(
+        (
+            f"Could not find valid SSH key loader for {file=}. "
+            "Is it corrupted or in the incorrect format?"
+        ),
+        exceptions,
+    )
+
+
+def make_openSSH_key_checker(file: os.PathLike, **kwargs):
+    from cryptography.hazmat.primitives.serialization import load_ssh_private_key
+
+    return _try_make_ssh_key_checker_from_loader(
+        load_ssh_private_key,
+        "Corrupt data: broken checksum",  # Defined in cryptography's ssh.py, since 2020
+        file,
+        **kwargs,
+    )
+
+
+def make_ssh_pem_key_checker(file: os.PathLike, **kwargs):
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+    return _try_make_ssh_key_checker_from_loader(
+        load_pem_private_key,
+        "Incorrect password, could not decrypt key",  # Defined in cryptography's Rust extension since Apr 2025
+        file,
+        **kwargs,
+    )
+
+
 def check_passwords_sequentially(
     candidates: Iterable[tuple[str, int]],
     test_func: Callable[[str], bool],
@@ -405,6 +522,9 @@ default_password_protected_file_checker_factories = {
     ".json": make_py_avdu_aegis_checker,
     ".kdbx": make_pykeepass_checker,
     ".kdb": make_pykeepass_checker,
+    ".pem": make_ssh_key_checker,  # could make this the legacy PEM one?
+    ".key": make_ssh_key_checker,
+    ".priv": make_ssh_key_checker,
 }
 
 
@@ -543,12 +663,9 @@ def add_command_arg(name, command, help: str | None = None):
     )
 
 
+add_command_arg("--shell", make_subprocess_checker)
 add_command_arg("--7zip", make_7zip_checker)
 add_command_arg("--7zip-persistent", make_persistent_7zip_checker)
-add_command_arg("--shell", make_subprocess_checker)
-add_command_arg("--py7zr", make_py7zr_checker)
-add_command_arg("--aegis", make_py_avdu_aegis_checker)
-add_command_arg("--keypassxc", make_pykeepass_checker)
 add_command_arg(
     "--pipe",
     make_password_candidate_piper,
@@ -559,6 +676,13 @@ add_command_arg(
     ),
 )
 add_command_arg("--print-char-map", "print-char-map")
+# Optional commands requiring extra deps
+add_command_arg("--ssh", make_ssh_key_checker)
+add_command_arg("--openssh", make_openSSH_key_checker)
+add_command_arg("--ssh-pem", make_ssh_pem_key_checker)
+add_command_arg("--keypassxc", make_pykeepass_checker)
+add_command_arg("--aegis", make_py_avdu_aegis_checker)
+add_command_arg("--py7zr", make_py7zr_checker)
 
 
 alt_char_map_group = add_mutex_group(
@@ -635,9 +759,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         ):
             password_guesses.append(password_guess)
 
-    output_file = kwargs.pop("output_file")
     extras = kwargs.pop("extras")
-    extract_to = kwargs.pop("extract_to")
 
     if ns.command is None:
         command = _default_factory_selector(*extras)
@@ -645,13 +767,20 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         command = ns.command
 
     if (
-        (command is make_py_avdu_aegis_checker or command is make_pykeepass_checker)
+        command
+        in (
+            make_ssh_key_checker,
+            make_openSSH_key_checker,
+            make_ssh_pem_key_checker,
+            make_py_avdu_aegis_checker,
+            make_pykeepass_checker,
+        )
         and not ns.print_passwords
-        and not output_file
+        and not ns.output_file
         and ns.verbosity == 0
     ):
         warnings.warn(
-            "The Keepass and the Aegis vault checkers do not decrypt files. "
+            "The SSH key, Keepass and the Aegis vault checkers do not decrypt files. "
             "When running fiddlesticks without print-passwords, without "
             "an output-file, and with verbosity=0, only the candidate number "
             "of any recovered password will be printed. "
@@ -660,7 +789,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
     total, candidates = ns.password_generator(
         guesses=password_guesses, max_subs=ns.max_subs, alt_char_map=alt_char_map
     )
-    checker = command(*extras, extract_to=extract_to)
+    checker = command(*extras, **kwargs)
 
     t0 = time.time()
 
@@ -678,14 +807,9 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         return 1
 
     password, i = result
-    msg = f"\n Found password (guess number: {i}) in {t1 - t0:.3f} seconds"
-    print_to_stderr(msg, end="")
 
-    print_to_stderr(f" {password=}" if ns.print_passwords else "")
+    possibly_output_found_password(password, i, t1 - t0, **kwargs)
 
-    if output_file:
-        with open(output_file, "at") as f:
-            f.write(f"{password}")
     return 0
 
 
