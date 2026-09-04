@@ -72,18 +72,17 @@ def test_are_error_strings_in_cryptography_unchanged(tmp_path):
             load_pem_private_key,
             keyfiles_and_pwds[1][0],
         ),
-# Seen other errors:
-#
-#         3
-# =================================== FAILURES ===================================
-# _______________ test_are_error_strings_in_cryptography_unchanged _______________
-# tests/misc_tests.py:78: in test_are_error_strings_in_cryptography_unchanged
-#     loader(private_key_data, ***"the_wrong_password")
-# E   ValueError: Could not deserialize key data. The data may be in an incorrect format, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters). Details: ASN.1 parsing error: unexpected tag (got Tag { value: 20, constructed: false, class: Application })
-# E   If your key is in PKCS#8 format, you must use BEGIN/END PRIVATE KEY PEM delimiters
-#
-# https://github.com/Hazardous-Area/fiddlesticks/actions/runs/33859787867/job/100981355309#logs
-
+        # Seen other errors:
+        #
+        #         3
+        # =================================== FAILURES ===================================
+        # _______________ test_are_error_strings_in_cryptography_unchanged _______________
+        # tests/misc_tests.py:78: in test_are_error_strings_in_cryptography_unchanged
+        #     loader(private_key_data, ***"the_wrong_password")
+        # E   ValueError: Could not deserialize key data. The data may be in an incorrect format, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters). Details: ASN.1 parsing error: unexpected tag (got Tag { value: 20, constructed: false, class: Application })
+        # E   If your key is in PKCS#8 format, you must use BEGIN/END PRIVATE KEY PEM delimiters
+        #
+        # https://github.com/Hazardous-Area/fiddlesticks/actions/runs/33859787867/job/100981355309#logs
     ]:
         private_key_data = file.read_bytes()
         try:
