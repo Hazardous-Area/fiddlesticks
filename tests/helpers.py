@@ -2,7 +2,6 @@ import string
 import subprocess
 from pathlib import Path
 
-import pytest
 from hypothesis.strategies import (
     binary,
     composite,  # Can be slow
@@ -185,10 +184,10 @@ def _try_get_avdu_vault(vault_dir: Path):
         check=True,
         capture_output=True,
     )
-    return avdu_repo / "test" / "data" / "aegis_encrypted.json"
+    return vault_dir / "test" / "data" / "aegis_encrypted.json"
 
 
-def _try_make_key_files(keys_dir: Path, password: str = "") -> list[tuple[Path, str]]:
+def _try_make_ssh_key_files(keys_dir: Path, password: str = "") -> list[tuple[Path, str]]:
     keyfiles_and_pwds = []
     for cmd, pwd, key_file in [
         (

@@ -19,7 +19,7 @@ from .helpers import (
     SEVEN_ZIP_TEST_ARCHIVE,
     _assert_output_on_found_password,
     _try_get_avdu_vault,
-    _try_make_key_files,
+    _try_make_ssh_key_files,
 )
 
 
@@ -83,7 +83,7 @@ def test_sequential_passwords_checker_verbosity_2(capsys):
 
 
 def test_ssh_key_checker(tmp_path):
-    ssh_test_keys = _try_make_key_files(tmp_path)
+    ssh_test_keys = _try_make_ssh_key_files(tmp_path)
     for key_file, pw in ssh_test_keys:
         assert key_file.is_file()
         checker = make_ssh_key_checker(key_file)
@@ -100,7 +100,7 @@ def test_ssh_key_checker_no_username_finds_password_on_init(
     tmp_path,
     capsys,
 ):
-    keyfiles_and_pwds = _try_make_key_files(tmp_path, "password123")
+    keyfiles_and_pwds = _try_make_ssh_key_files(tmp_path, "password123")
     with patch("getpass.getuser", side_effect=OSError):
         for file, _pwd in keyfiles_and_pwds:
             with pytest.raises(SystemExit):
