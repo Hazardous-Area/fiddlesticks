@@ -22,6 +22,10 @@ jobs:
       run: |
         pip install -e . --group=test
 
+    - name: Check Git hasn't corrupted test data files
+      run: |
+        sha256sum tests/data_files/Test_vault_Do_Not_Use.kdbx
+
     - name: Run PyTest (via Coverage)
       run: |
         coverage run -m pytest -rA -vv --tb=short tests && coverage combine && coverage report
