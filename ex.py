@@ -1,24 +1,16 @@
-import io
-from pathlib import Path
+# "c:\Program Files\VeraCrypt\VeraCrypt Format.exe" /create test.hc /size 292K /password test /filesystem FAT /silent /force
 
-import msoffcrypto
+# Then to test, the following is needed:
+# Example failure:
+# >"c:\Program Files\VeraCrypt\VeraCrypt.exe" /volume test.hc /letter X /password testh /quit /silent
+# C:\...>cd X:
+# The system cannot find the drive specified.
+# C:\...>echo %ERRORLEVEL%
+# 1
 
-# import pandas as pd
-
-file = Path(__file__).parent / "tests" / "test.xlsx"
-encrypted = io.BytesIO(file.read_bytes())
-stream = io.BytesIO()
-
-office_file = msoffcrypto.OfficeFile(encrypted)
-
-for pw in ["test3", "test"]:
-    office_file.load_key(password=pw)
-    try:
-        office_file.decrypt(stream)
-        break
-    except msoffcrypto.exceptions.InvalidKeyError:
-        pass
-
-
-# df = pd.read_excel(stream)
-# print(df)
+# Example success:
+# C:\...>"c:\Program Files\VeraCrypt\VeraCrypt.exe" /volume test.hc /letter X /password test /quit /silent
+# C:\...>cd X:
+# X:\
+# C:\...>echo %ERRORLEVEL%
+# 0
