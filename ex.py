@@ -1,3 +1,17 @@
+# Ubuntu 26 & Bash
+# wget https://github.com/veracrypt/VeraCrypt/releases/download/VeraCrypt_1.26.29/veracrypt-console-1.26.29-Ubuntu-26.04-amd64.deb
+# TODO: verify download
+# sudo apt install ./veracrypt-console-1.26.29-Ubuntu-26.04-amd64.deb
+# mkdir /mnt/vc
+# veracrypt --text --password="test4" --non-interactive --keyfiles="" --pim=0 --protect-hidden=no --mount test.hc /mnt/vc
+# echo $?
+# veracrypt --list
+
+# On success, to unmount:
+# veracrypt --unmount
+
+
+# Windows & cmd.exe
 # "c:\Program Files\VeraCrypt\VeraCrypt Format.exe" /create test.hc /size 292K /password test /filesystem FAT /silent /force
 
 # Then to test, the following is needed:
