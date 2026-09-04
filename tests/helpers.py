@@ -2,6 +2,7 @@ import string
 import subprocess
 from pathlib import Path
 
+import pytest
 from hypothesis.strategies import (
     binary,
     composite,  # Can be slow
@@ -186,7 +187,7 @@ def avdu_test_vault(tmp_path_factory):
         check=True,
         capture_output=True,
     )
-    return vault_dir / "test" / "data" / "aegis_encrypted.json"
+    return avdu_repo / "test" / "data" / "aegis_encrypted.json"
 
 
 def _try_make_ssh_key_files(

@@ -18,7 +18,6 @@ from .helpers import (
     KDBX_TEST_VAULT,
     SEVEN_ZIP_TEST_ARCHIVE,
     _assert_output_on_found_password,
-    _try_make_key_files,
     _try_make_ssh_key_files,
     avdu_test_vault,  # noqa: F401
 )
