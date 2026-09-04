@@ -177,7 +177,7 @@ def _assert_candidate_within_M_of_pwds(
 
 
 @pytest.fixture(scope="session")
-def avdu_test_vault(tmp_path_factory):
+def avdu_test_vault(tmp_path_factory) -> Path:
     avdu_repo = tmp_path_factory.mktemp("avdu")
     subprocess.run(
         [
@@ -194,7 +194,8 @@ def avdu_test_vault(tmp_path_factory):
 
 
 def _try_make_ssh_key_files(
-    keys_dir: Path, password: str = ""
+    keys_dir: Path,
+    password: str = "",
 ) -> list[tuple[Path, str]]:
     keyfiles_and_pwds = []
     for cmd, pwd, key_file in [
@@ -239,3 +240,32 @@ def _assert_output_on_found_password(
         assert password in stderr, f"{stderr=}"
     else:
         assert password not in stderr, f"{stderr=}"
+
+
+def _try_make_veracrypt_volume(
+    volume: Path,
+    password: str,
+) -> subprocess.CompletedProcess:
+
+    args = [
+        "veracrypt",
+        "--text",
+        "--non-interactive",
+        "--create",
+        "--encryption=AES",
+        "--hash=SHA-512",
+        "--pim=0",
+        "--volume-type=normal",
+        "--filesystem=FAT",
+        "--keyfiles=",
+        "--size=512K",
+        f"--password={password}",
+        volume.as_posix(),
+    ]
+
+    return subprocess.run(
+        " ".join(args),
+        check=True,
+        capture_output=True,
+        shell=True,
+    )

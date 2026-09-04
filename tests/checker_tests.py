@@ -14,6 +14,7 @@ from fiddlesticks import (
     make_pykeepass_checker,
     make_ssh_key_checker,
     make_subprocess_checker,
+    make_Veracrypt_checker,
 )
 
 from .helpers import (
@@ -23,6 +24,7 @@ from .helpers import (
     XLSX_FILE,
     _assert_output_on_found_password,
     _try_make_ssh_key_files,
+    _try_make_veracrypt_volume,
     avdu_test_vault,  # noqa: F401
 )
 
@@ -53,9 +55,9 @@ def test_pykeepass_checker_against_Test_vault():
 
 
 def test_make_new_tmp_sub_dir(tmp_path, capsys):
-    _make_new_tmp_sub_dir("", tmp_path)
+    _make_new_tmp_sub_dir(tmp_path)
     # repeat to test while loop, and append a suffix.
-    _make_new_tmp_sub_dir("", tmp_path)
+    _make_new_tmp_sub_dir(tmp_path)
     capsys.readouterr()
 
 
@@ -125,4 +127,18 @@ def test_ssh_key_checker_bad_file(tmp_path):
 def test_ms_office_crypto_tool_checker(path: Path):
     checker = make_MS_Office_files_key_checker(path)
     assert not checker("not_test")
+    assert checker("test")
+
+
+def test_veracrypt_checker(tmp_path):
+    volume = tmp_path / "test.hc"
+    password = "test"
+    # Default mount point ./mnt/veracrypt_volume{_X}
+    _try_make_veracrypt_volume(volume, password)
+
+    checker = make_Veracrypt_checker(file=volume)
+    assert not checker("not_test")
+
+    # This can fail if the volume is already mounted, or
+    # if something is already mounted to the same mount point.
     assert checker("test")
