@@ -466,6 +466,7 @@ def make_ssh_pem_key_checker(file: os.PathLike, **kwargs):
     return _try_make_ssh_key_checker_from_loader(
         load_pem_private_key,
         "Incorrect password, could not decrypt key",  # Defined in cryptography's Rust extension since Apr 2025
+        # TODO: Investigate the other error strings that have been seen.  See misc_tests.py
         file,
         **kwargs,
     )
