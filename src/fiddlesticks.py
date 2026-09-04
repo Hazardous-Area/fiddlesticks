@@ -489,6 +489,7 @@ def make_MS_Office_files_key_checker(file: os.PathLike, **kwargs):
             return True
         except msoffcrypto.exceptions.InvalidKeyError:
             return False
+    return checker
 
 
 def check_passwords_sequentially(

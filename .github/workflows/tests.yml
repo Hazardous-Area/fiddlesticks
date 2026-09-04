@@ -24,4 +24,4 @@ jobs:
 
     - name: Run PyTest (via Coverage)
       run: |
-        coverage run -m pytest -rA --tb=short tests && coverage combine && coverage report
+        coverage run -m pytest -rA -vv --tb=short tests && coverage combine && coverage report
