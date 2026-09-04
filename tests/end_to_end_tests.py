@@ -21,7 +21,7 @@ from .helpers import (
     _assert_candidate_within_M_of_pwds,
     _assert_files_same,
     _create_password_protected_7z_archive,
-    _try_get_avdu_vault,
+    avdu_test_vault,  # noqa: F401
     chars_without_Bash_syntax,
     file_names_and_contents,
     guesses_and_num_subs_from_password,
@@ -164,8 +164,7 @@ def test_other_7z_checkers_without_extract_to(command, tmp_path):
     assert result.returncode == 0
 
 
-def test_default_command_with_aegis_vault(tmp_path):
-    avdu_test_vault = _try_get_avdu_vault(tmp_path)
+def test_default_command_with_aegis_vault(avdu_test_vault, tmp_path):  # noqa: F811
     result = subprocess.run(
         _collate_args(2, ["7est"], avdu_test_vault),
         capture_output=True,
@@ -400,8 +399,7 @@ def test_piping_candidates_to_stdout(
     # # (despite that the default is True in CI ???
     # # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
 )
-def test_aegis_checker_from_CLI(guess_and_num_subs, tmp_path):
-    avdu_test_vault = _try_get_avdu_vault(tmp_path)
+def test_aegis_checker_from_CLI(guess_and_num_subs, avdu_test_vault):  # noqa: F811
     guess, num_subs = guess_and_num_subs
     result = subprocess.run(
         _collate_args(num_subs, [guess], "--aegis", str(avdu_test_vault)),
@@ -413,8 +411,7 @@ def test_aegis_checker_from_CLI(guess_and_num_subs, tmp_path):
     )
 
 
-def test_aegis_checker_errors_from_CLI(tmp_path):
-    avdu_test_vault = _try_get_avdu_vault(tmp_path)
+def test_aegis_checker_errors_from_CLI(avdu_test_vault):  # noqa: F811
     num_subs = 3
     guess = "abcd"  # i.e. not "test" (but not too long either)
     result = subprocess.run(

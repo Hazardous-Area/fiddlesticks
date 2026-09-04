@@ -18,8 +18,9 @@ from .helpers import (
     KDBX_TEST_VAULT,
     SEVEN_ZIP_TEST_ARCHIVE,
     _assert_output_on_found_password,
-    _try_get_avdu_vault,
+    _try_make_key_files,
     _try_make_ssh_key_files,
+    avdu_test_vault,  # noqa: F401
 )
 
 
@@ -31,8 +32,7 @@ def test_is_7zip_installed():
     subprocess.run(args, capture_output=True, check=True)
 
 
-def test_aegis_checker_against_avdu_vault(tmp_path):
-    avdu_test_vault = _try_get_avdu_vault(tmp_path)
+def test_aegis_checker_against_avdu_vault(avdu_test_vault):  # noqa: F811
     checker = make_py_avdu_aegis_checker(avdu_test_vault)
     # """
     # # Run using the encrypted test file. (Enter password "test" when prompted.)

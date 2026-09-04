@@ -172,14 +172,16 @@ def _assert_candidate_within_M_of_pwds(
     )
 
 
-def _try_get_avdu_vault(vault_dir: Path):
+@pytest.fixture(scope="session")
+def avdu_test_vault(tmp_path_factory):
+    avdu_repo = tmp_path_factory.mktemp("avdu")
     subprocess.run(
         [
             "git",
             "clone",
             "--depth=1",
             "https://github.com/Sammy-T/avdu/",
-            str(vault_dir),
+            str(avdu_repo),
         ],
         check=True,
         capture_output=True,
