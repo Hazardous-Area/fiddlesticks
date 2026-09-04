@@ -1,3 +1,5 @@
 * text eol=lf
-*.kdbx,*.7z,*.docx,*.xlsx binary
-*.kdbx,*.7z,*.docx,*.xlsx -text -diff No newline at end of file
+*.kdbx binary
+*.7z binary
+*.docx binary
+*.xlsx binary
