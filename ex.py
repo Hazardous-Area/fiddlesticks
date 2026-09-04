@@ -2,6 +2,10 @@
 # wget https://github.com/veracrypt/VeraCrypt/releases/download/VeraCrypt_1.26.29/veracrypt-console-1.26.29-Ubuntu-26.04-amd64.deb
 # TODO: verify download
 # sudo apt install ./veracrypt-console-1.26.29-Ubuntu-26.04-amd64.deb
+#
+# veracrypt --text --non-interactive --create --encryption=AES --hash=SHA-512 --pim=0 
+# --volume-type=normal --filesystem=none --keyfiles="" --size=512K --password=test test.hc
+#
 # mkdir /mnt/vc
 # veracrypt --text --password="test4" --non-interactive --keyfiles="" --pim=0 --protect-hidden=no --mount test.hc /mnt/vc
 # echo $?
