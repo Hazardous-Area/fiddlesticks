@@ -793,13 +793,11 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         command = ns.command
 
     if (
-        command
-        in (
-            make_ssh_key_checker,
-            make_openSSH_key_checker,
-            make_ssh_pem_key_checker,
-            make_py_avdu_aegis_checker,
-            make_pykeepass_checker,
+        command not in (
+            make_7zip_checker,
+            make_persistent_7zip_checker,
+            make_subprocess_checker,
+            make_password_candidate_piper,
         )
         and not ns.print_passwords
         and not ns.output_file
