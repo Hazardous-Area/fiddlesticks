@@ -173,16 +173,14 @@ def _assert_candidate_within_M_of_pwds(
     )
 
 
-@pytest.fixture(scope="session")
-def avdu_test_vault(tmp_path_factory):
-    avdu_repo = tmp_path_factory.mktemp("avdu")
+def _try_get_avdu_vault(vault_dir: Path):
     subprocess.run(
         [
             "git",
             "clone",
             "--depth=1",
             "https://github.com/Sammy-T/avdu/",
-            str(avdu_repo),
+            str(vault_dir),
         ],
         check=True,
         capture_output=True,
@@ -218,12 +216,6 @@ def _try_make_key_files(keys_dir: Path, password: str = "") -> list[tuple[Path, 
         )
         keyfiles_and_pwds.append((keys_dir / key_file, pwd))
     return keyfiles_and_pwds
-
-
-@pytest.fixture(scope="session")
-def ssh_test_keys(tmp_path_factory) -> list[tuple[Path, str]]:
-    keys_dir = tmp_path_factory.mktemp("test_ssh_keys_DO_NOT_USE")
-    return _try_make_key_files(keys_dir)
 
 
 def _assert_output_on_found_password(

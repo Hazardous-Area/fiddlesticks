@@ -18,9 +18,8 @@ from .helpers import (
     KDBX_TEST_VAULT,
     SEVEN_ZIP_TEST_ARCHIVE,
     _assert_output_on_found_password,
+    _try_get_avdu_vault,
     _try_make_key_files,
-    avdu_test_vault,  # noqa: F401
-    ssh_test_keys,  # noqa: F401
 )
 
 
@@ -32,7 +31,8 @@ def test_is_7zip_installed():
     subprocess.run(args, capture_output=True, check=True)
 
 
-def test_aegis_checker_against_avdu_vault(avdu_test_vault):  # noqa: F811
+def test_aegis_checker_against_avdu_vault(tmp_path):
+    avdu_test_vault = _try_get_avdu_vault(tmp_path)
     checker = make_py_avdu_aegis_checker(avdu_test_vault)
     # """
     # # Run using the encrypted test file. (Enter password "test" when prompted.)
@@ -82,7 +82,8 @@ def test_sequential_passwords_checker_verbosity_2(capsys):
     assert result is None
 
 
-def test_ssh_key_checker(ssh_test_keys):  # noqa: F811
+def test_ssh_key_checker(tmp_path):
+    ssh_test_keys = _try_make_key_files(tmp_path)
     for key_file, pw in ssh_test_keys:
         assert key_file.is_file()
         checker = make_ssh_key_checker(key_file)
