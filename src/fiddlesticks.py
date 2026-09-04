@@ -403,7 +403,6 @@ def _try_make_ssh_key_checker_from_loader(
         )
         sys.exit(0)
 
-
     def checker(candidate: str) -> bool:
         try:
             loader(
