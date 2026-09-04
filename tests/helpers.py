@@ -17,8 +17,11 @@ import fiddlesticks
 
 BI_MAP = fiddlesticks.SHIFT_AND_LEET_BI_MAP
 PARENT_DIR = Path(__file__).parent
-KDBX_TEST_VAULT = PARENT_DIR / "Test_vault_Do_Not_Use.kdbx"
-SEVEN_ZIP_TEST_ARCHIVE = PARENT_DIR / "foo.7z"
+DATA_FILES = PARENT_DIR / "data_files"
+KDBX_TEST_VAULT = DATA_FILES / "Test_vault_Do_Not_Use.kdbx"
+SEVEN_ZIP_TEST_ARCHIVE = DATA_FILES / "foo.7z"
+XLSX_FILE = DATA_FILES / "test.xlsx"
+DOCX_FILE = DATA_FILES / "test.docx"
 
 file_names = text(
     alphabet=string.ascii_letters + string.digits,

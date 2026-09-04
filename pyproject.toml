@@ -24,7 +24,7 @@ fiddlesticks = "fiddlesticks:cli"
 
 [project.optional-dependencies]
 ssh = [
-    "cryptography>=47", # For incorrect PW error message from Rust code
+    "cryptography>=47", # For "incorrect PW" error message from Rust code
     "bcrypt",
 ]
 keepassxc = [
@@ -36,6 +36,9 @@ aegis = [
 py7zr = [
     "py7zr",
 ]
+msoffice = [
+    "msoffcrypto-tool",
+]
 
 [dependency-groups]
 dev = [
@@ -43,7 +46,7 @@ dev = [
     {include-group = "test"},
 ]
 test = [
-    "fiddlesticks[ssh,keepassxc,aegis,py7zr]",
+    "fiddlesticks[ssh,keepassxc,aegis,py7zr,msoffice]",
     "pytest",
     "hypothesis",
     "coverage>=7.13",

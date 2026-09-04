@@ -1,5 +1,9 @@
+import io
+from pathlib import Path
 from unittest.mock import patch
 
+import msoffcrypto
+import msoffcrypto.exceptions
 import pytest
 from cryptography.hazmat.primitives.serialization import (
     load_pem_private_key,
@@ -14,7 +18,9 @@ from fiddlesticks import (
 )
 
 from .helpers import (
+    DOCX_FILE,
     SEVEN_ZIP_TEST_ARCHIVE,
+    XLSX_FILE,
     _assert_output_on_found_password,
     _try_make_ssh_key_files,
 )
@@ -96,3 +102,20 @@ def test_are_error_strings_in_cryptography_unchanged(tmp_path):
     assert n == 2, (
         "SSH Key file loaded via cryptography primitive with the_wrong_password??!!"
     )
+
+
+@pytest.mark.parametrize("path", [XLSX_FILE, DOCX_FILE])
+def test_msoffice_crypto_tools(path: Path):
+    # Not so different to msoffcrypto-tool's example:
+    # https://github.com/nolze/msoffcrypto-tool#as-library
+    encrypted = io.BytesIO(path.read_bytes())
+    stream = io.BytesIO()
+
+    office_file = msoffcrypto.OfficeFile(encrypted)
+
+    office_file.load_key(password="not_test")
+    with pytest.raises(msoffcrypto.exceptions.InvalidKeyError):
+        office_file.decrypt(stream)
+
+    office_file.load_key(password="test")
+    office_file.decrypt(stream)

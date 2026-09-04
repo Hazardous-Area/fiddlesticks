@@ -199,7 +199,7 @@ def test_input_and_output_file(tmp_path):
             "--py7zr",
             f"--input-file={guesses_file}",
             f"--output-file={output_file}",
-            str(Path(__file__).parent / "foo.7z"),
+            str(SEVEN_ZIP_TEST_ARCHIVE),
         ],
         capture_output=True,
         check=True,
