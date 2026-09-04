@@ -391,6 +391,10 @@ def _try_make_ssh_key_checker_from_loader(
     hopefully_incorrect_password = _get_hopefully_incorrect_password()
     try:
         loader(private_key_data, password=hopefully_incorrect_password.encode())
+    except ValueError as e:
+        if e.args[0] != incorrect_password_msg:
+            raise
+    else:
         possibly_output_found_password(
             hopefully_incorrect_password,
             i=-12345,
@@ -398,9 +402,6 @@ def _try_make_ssh_key_checker_from_loader(
             **kwargs,
         )
         sys.exit(0)
-    except ValueError as e:
-        if e.args[0] != incorrect_password_msg:
-            raise
 
     def checker(candidate: str) -> bool:
         try:

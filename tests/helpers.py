@@ -190,7 +190,9 @@ def avdu_test_vault(tmp_path_factory):
     return avdu_repo / "test" / "data" / "aegis_encrypted.json"
 
 
-def _try_make_key_files(keys_dir: Path, password: str = "") -> list[tuple[Path, str]]:
+def _try_make_ssh_key_files(
+    keys_dir: Path, password: str = ""
+) -> list[tuple[Path, str]]:
     keyfiles_and_pwds = []
     for cmd, pwd, key_file in [
         (
@@ -218,12 +220,6 @@ def _try_make_key_files(keys_dir: Path, password: str = "") -> list[tuple[Path, 
         )
         keyfiles_and_pwds.append((keys_dir / key_file, pwd))
     return keyfiles_and_pwds
-
-
-@pytest.fixture(scope="session")
-def ssh_test_keys(tmp_path_factory) -> list[tuple[Path, str]]:
-    keys_dir = tmp_path_factory.mktemp("test_ssh_keys_DO_NOT_USE")
-    return _try_make_key_files(keys_dir)
 
 
 def _assert_output_on_found_password(
