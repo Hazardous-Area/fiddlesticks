@@ -1,5 +1,6 @@
 import stat
 import subprocess
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -8,6 +9,7 @@ from fiddlesticks import (
     IS_WINDOWS,
     _make_new_tmp_sub_dir,
     check_passwords_sequentially,
+    make_MS_Office_files_key_checker,
     make_py_avdu_aegis_checker,
     make_pykeepass_checker,
     make_ssh_key_checker,
@@ -15,8 +17,10 @@ from fiddlesticks import (
 )
 
 from .helpers import (
+    DOCX_FILE,
     KDBX_TEST_VAULT,
     SEVEN_ZIP_TEST_ARCHIVE,
+    XLSX_FILE,
     _assert_output_on_found_password,
     _try_make_ssh_key_files,
     avdu_test_vault,  # noqa: F401
@@ -115,3 +119,10 @@ def test_ssh_key_checker_bad_file(tmp_path):
     file.write_bytes(b"oh2343gsbnwRPJWG32546OMPJDFAFSDGH&53423NZjiga")
     with pytest.raises(ExceptionGroup):
         make_ssh_key_checker(file)
+
+
+@pytest.mark.parametrize("path", [XLSX_FILE, DOCX_FILE])
+def test_ms_office_crypto_tool_checker(path: Path):
+    checker = make_MS_Office_files_key_checker(path)
+    assert not checker("not_test")
+    assert checker("test")

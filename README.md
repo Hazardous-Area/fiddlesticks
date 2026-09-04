@@ -3,14 +3,15 @@
 ![Tests passing](https://github.com/Hazardous-Area/fiddlesticks/actions/workflows/tests.yml/badge.svg)
 ![Code qual](https://github.com/Hazardous-Area/fiddlesticks/actions/workflows/lint.yml/badge.svg)
 
-Version 0.3.0
+Version 0.4.0
 
 ## Description
 Password recovery tool, for password-encrypted files, using simple off-line brute 
 force attacks.  Password candidates are generated, using common variations 
-of a guessed password (e.g. typos and substitutions).  .7z, .kdbx and Aegis archives 
-are directly supported, but Fiddlesticks can also call any shell command, that accepts 
-a candidate password.
+of a guessed password (e.g. typos and substitutions). SSH keys, Aegis archives, plus
+.7z, .kdbx, .xlsx, and .docx files, are directly supported, but 
+Fiddlesticks can also call any shell command, that accepts a candidate password, 
+e.g. for Veracrypt volumes (and can pipe candidates to stdout).
 
 ### Raison d'etre
  - Password-protected file owners recovering their own password themselves, as long as 

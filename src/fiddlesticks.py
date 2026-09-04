@@ -472,6 +472,27 @@ def make_ssh_pem_key_checker(file: os.PathLike, **kwargs):
     )
 
 
+def make_MS_Office_files_key_checker(file: os.PathLike, **kwargs):
+
+    import msoffcrypto
+    import msoffcrypto.exceptions
+
+    encrypted = io.BytesIO(Path(file).read_bytes())
+    office_file = msoffcrypto.OfficeFile(encrypted)
+
+    stream = io.BytesIO()
+
+    def checker(candidate: str) -> bool:
+        office_file.load_key(password=candidate)
+        try:
+            office_file.decrypt(stream)
+            return True
+        except msoffcrypto.exceptions.InvalidKeyError:
+            return False
+
+    return checker
+
+
 def check_passwords_sequentially(
     candidates: Iterable[tuple[str, int]],
     test_func: Callable[[str], bool],
@@ -527,6 +548,8 @@ default_password_protected_file_checker_factories = {
     ".pem": make_ssh_key_checker,  # could make this the legacy PEM one?
     ".key": make_ssh_key_checker,
     ".priv": make_ssh_key_checker,
+    ".docx": make_MS_Office_files_key_checker,
+    ".xlsx": make_MS_Office_files_key_checker,
 }
 
 
@@ -685,6 +708,7 @@ add_command_arg("--ssh-pem", make_ssh_pem_key_checker)
 add_command_arg("--keypassxc", make_pykeepass_checker)
 add_command_arg("--aegis", make_py_avdu_aegis_checker)
 add_command_arg("--py7zr", make_py7zr_checker)
+add_command_arg("--msoffice", make_MS_Office_files_key_checker)
 
 
 alt_char_map_group = add_mutex_group(

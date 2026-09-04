@@ -1,2 +1,5 @@
 * text eol=lf
-*.kdbx,*.7z binary
+*.kdbx binary
+*.7z binary
+*.docx binary
+*.xlsx binary
