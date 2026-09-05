@@ -30,7 +30,9 @@ jobs:
       run: wget https://github.com/veracrypt/VeraCrypt/releases/download/VeraCrypt_1.26.29/veracrypt-console-1.26.29-Ubuntu-26.04-amd64.deb
 
     - name: Install Veracrypt from downloaded .deb
-      run: sudo apt install -y ./veracrypt-console-1.26.29-Ubuntu-26.04-amd64.deb
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ./veracrypt-console-1.26.29-Ubuntu-26.04-amd64.deb
 
     - name: Run PyTest (via Coverage)
       run: |
