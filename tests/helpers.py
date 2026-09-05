@@ -257,7 +257,7 @@ def _try_make_veracrypt_volume(
         "--pim=0",
         "--volume-type=normal",
         "--filesystem=FAT",
-        '--keyfiles=',
+        "--keyfiles=",
         "--size=512K",
         f"--password={password}",
         volume.as_posix(),
@@ -269,4 +269,3 @@ def _try_make_veracrypt_volume(
         capture_output=True,
         shell=True,
     )
-

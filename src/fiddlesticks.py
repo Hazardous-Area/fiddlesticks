@@ -499,12 +499,12 @@ def make_MS_Office_files_key_checker(file: os.PathLike, **kwargs):
 
 
 def make_Veracrypt_checker(file: os.PathLike, **kwargs):
-    
+
     # Ensure we can run Veracrypy in a subprocess.
     subprocess.run(["veracrypt", "--help"], capture_output=True, check=True)
 
     mount_point = _make_new_tmp_sub_dir(
-        tmp_dir = Path("/mnt"),
+        tmp_dir=Path("/mnt"),
         name="veracrypt_volume",
     )
 
@@ -581,8 +581,8 @@ default_password_protected_file_checker_factories = {
     ".priv": make_ssh_key_checker,
     ".docx": make_MS_Office_files_key_checker,
     ".xlsx": make_MS_Office_files_key_checker,
-    ".hc" : make_Veracrypt_checker,
-    ".tc" : make_Veracrypt_checker,
+    ".hc": make_Veracrypt_checker,
+    ".tc": make_Veracrypt_checker,
 }
 
 
@@ -827,7 +827,8 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         command = ns.command
 
     if (
-        command not in (
+        command
+        not in (
             make_7zip_checker,
             make_persistent_7zip_checker,
             make_subprocess_checker,

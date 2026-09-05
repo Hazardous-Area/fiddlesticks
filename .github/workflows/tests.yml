@@ -26,6 +26,12 @@ jobs:
       run: |
         sha256sum tests/data_files/Test_vault_Do_Not_Use.kdbx
 
+    - name: Download Veracrypt .deb
+      run: wget https://github.com/veracrypt/VeraCrypt/releases/download/VeraCrypt_1.26.29/veracrypt-console-1.26.29-Ubuntu-26.04-amd64.deb
+
+    - name: Install Veracrypt from downloaded .deb
+      run: sudo apt install -y ./veracrypt-console-1.26.29-Ubuntu-26.04-amd64.deb
+
     - name: Run PyTest (via Coverage)
       run: |
         coverage run -m pytest -rA -vv --tb=short tests && coverage combine && coverage report

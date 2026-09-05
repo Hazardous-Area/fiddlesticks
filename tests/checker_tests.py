@@ -24,8 +24,8 @@ from .helpers import (
     XLSX_FILE,
     _assert_output_on_found_password,
     _try_make_ssh_key_files,
-    avdu_test_vault,  # noqa: F401
     _try_make_veracrypt_volume,
+    avdu_test_vault,  # noqa: F401
 )
 
 
@@ -55,9 +55,9 @@ def test_pykeepass_checker_against_Test_vault():
 
 
 def test_make_new_tmp_sub_dir(tmp_path, capsys):
-    _make_new_tmp_sub_dir("", tmp_path)
+    _make_new_tmp_sub_dir(tmp_path)
     # repeat to test while loop, and append a suffix.
-    _make_new_tmp_sub_dir("", tmp_path)
+    _make_new_tmp_sub_dir(tmp_path)
     capsys.readouterr()
 
 
@@ -129,14 +129,13 @@ def test_ms_office_crypto_tool_checker(path: Path):
     assert not checker("not_test")
     assert checker("test")
 
+
 def test_veracrypt_checker(tmp_path):
     volume = tmp_path / "test.hc"
-    password="test"
+    password = "test"
     result = _try_make_veracrypt_volume(volume, password)
     result.check_returncode()
 
     checker = make_Veracrypt_checker(file=volume)
     assert not checker("not_test")
     assert checker("test")
-
-
