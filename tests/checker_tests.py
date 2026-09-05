@@ -14,6 +14,7 @@ from fiddlesticks import (
     make_pykeepass_checker,
     make_ssh_key_checker,
     make_subprocess_checker,
+    make_Veracrypt_checker,
 )
 
 from .helpers import (
@@ -24,6 +25,7 @@ from .helpers import (
     _assert_output_on_found_password,
     _try_make_ssh_key_files,
     avdu_test_vault,  # noqa: F401
+    _try_make_veracrypt_volume,
 )
 
 
@@ -126,3 +128,15 @@ def test_ms_office_crypto_tool_checker(path: Path):
     checker = make_MS_Office_files_key_checker(path)
     assert not checker("not_test")
     assert checker("test")
+
+def test_veracrypt_checker(tmp_path):
+    volume = tmp_path / "test.hc"
+    password="test"
+    result = _try_make_veracrypt_volume(volume, password)
+    result.check_returncode()
+
+    checker = make_Veracrypt_checker(file=volume)
+    assert not checker("not_test")
+    assert checker("test")
+
+

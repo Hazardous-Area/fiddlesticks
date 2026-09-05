@@ -216,7 +216,7 @@ def make_py7zr_checker(archive: str, extract_to: str | None = None, **kwargs):
     from py7zr.exceptions import Bad7zFile, PasswordRequired
 
     if extract_to is None:
-        extract_to = str(_make_new_tmp_sub_dir(archive))
+        extract_to = str(_make_new_tmp_sub_dir_for_7z(archive))
     stream = io.BytesIO(Path(archive).read_bytes())
 
     def is_correct_password_for_7z_file(candidate: str) -> bool:
@@ -241,10 +241,10 @@ def make_subprocess_checker(*args: str, **kwargs):
     # On the other hand, if last == "-p", e.g. with 7z,
     # the password is expected with no space separating it
     # from the -p.
-    # Therefore to stick with out contract of "any partial
+    # Therefore to honour our contract of "any partial
     # Bash command to which a password guess can be appended"
-    # it's easiest to use a single string,
-    # and (unless on Windows) shell=True
+    # it's easiest to use a single string (instead of an args list),
+    # and (unless on Windows) shell=True.
 
     def checker(candidate: str) -> bool:
         result = subprocess.run(
@@ -258,13 +258,18 @@ def make_subprocess_checker(*args: str, **kwargs):
     return checker
 
 
-def _make_new_tmp_sub_dir(file: str, tmp_dir: Path = TMP_DIR) -> Path:
+def _make_new_tmp_sub_dir(tmp_dir, name: str = "extracted") -> Path:
     i = -1
     suffix = ""
-    while (p := tmp_dir / f"extracted{suffix}").is_dir():
+    while (p := tmp_dir / f"{name}{suffix}").is_dir():
         i += 1
         suffix = f"_{i}"
-    p.mkdir()
+    p.mkdir(parents=True, exist_ok=False)
+    return p
+
+
+def _make_new_tmp_sub_dir_for_7z(file: str, tmp_dir: Path = TMP_DIR) -> Path:
+    p = _make_new_tmp_sub_dir(tmp_dir)
     print_to_stderr(f"If {file} is unzipped successfully, contents will be in: {p}")
     return p
 
@@ -275,7 +280,7 @@ def make_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
     subprocess.run(["7z", "--help"], capture_output=True, check=True)
 
     if extract_to is None:
-        extract_to = str(_make_new_tmp_sub_dir(file))
+        extract_to = str(_make_new_tmp_sub_dir_for_7z(file))
 
     return make_subprocess_checker("7z", "x", f"-o{extract_to}", file, "-p")
 
@@ -305,7 +310,7 @@ done
 
 def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
     if extract_to is None:
-        extract_to = str(_make_new_tmp_sub_dir(file))
+        extract_to = str(_make_new_tmp_sub_dir_for_7z(file))
 
     cmd = textwrap.dedent(
         PERSISTENT_7Z_CHECKER_OUTLINE.format(extract_to=extract_to, file=file)
@@ -493,6 +498,32 @@ def make_MS_Office_files_key_checker(file: os.PathLike, **kwargs):
     return checker
 
 
+def make_Veracrypt_checker(file: os.PathLike, **kwargs):
+    
+    # Ensure we can run Veracrypy in a subprocess.
+    subprocess.run(["veracrypt", "--help"], capture_output=True, check=True)
+
+    mount_point = _make_new_tmp_sub_dir(
+        tmp_dir = Path("/mnt"),
+        name="veracrypt_volume",
+    )
+
+    args = [
+        "/usr/bin/veracrypt",
+        "--text",
+        "--non-interactive",
+        '--keyfiles=""',
+        "--pim=0",
+        "--protect-hidden=no",
+        "--mount",
+        "/root/test.hc",
+        f"{mount_point}",
+        "--password=",
+    ]
+
+    return make_subprocess_checker(*args)
+
+
 def check_passwords_sequentially(
     candidates: Iterable[tuple[str, int]],
     test_func: Callable[[str], bool],
@@ -550,6 +581,8 @@ default_password_protected_file_checker_factories = {
     ".priv": make_ssh_key_checker,
     ".docx": make_MS_Office_files_key_checker,
     ".xlsx": make_MS_Office_files_key_checker,
+    ".hc" : make_Veracrypt_checker,
+    ".tc" : make_Veracrypt_checker,
 }
 
 
@@ -709,6 +742,7 @@ add_command_arg("--keypassxc", make_pykeepass_checker)
 add_command_arg("--aegis", make_py_avdu_aegis_checker)
 add_command_arg("--py7zr", make_py7zr_checker)
 add_command_arg("--msoffice", make_MS_Office_files_key_checker)
+add_command_arg("--veracrypt", make_Veracrypt_checker)
 
 
 alt_char_map_group = add_mutex_group(
