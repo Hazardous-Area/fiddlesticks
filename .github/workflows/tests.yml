@@ -18,14 +18,36 @@ jobs:
       with:
         python-version: "3.14"
     
-    - name: Install dependencies
-      run: |
-        pip install -e . --group=test
 
     - name: Check Git hasn't corrupted test data files
       run: |
         sha256sum tests/data_files/Test_vault_Do_Not_Use.kdbx
 
+    - name: Install Veracrypt from unit193's apt repo
+      run: |
+        sudo add-apt-repository ppa:unit193/encryption
+        sudo apt update
+        sudo apt install veracrypt
+
+    # - name: Create volume
+    #   run: |
+    #     python ./tests/veracrypt/create.py
+
+    # - name: Mount volume
+    #   run: |
+    #     python ./tests/veracrypt/mount.py
+
+
+    - name: Create venv
+      run: |
+        python3 -m venv .venv
+
+    - name: Install dependencies
+      run: |
+        . ./.venv/bin/activate
+        pip install -e . --group=test
+
     - name: Run PyTest (via Coverage)
       run: |
+        . ./.venv/bin/activate
         coverage run -m pytest -rA -vv --tb=short tests && coverage combine && coverage report

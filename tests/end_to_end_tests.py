@@ -21,6 +21,7 @@ from .helpers import (
     _assert_candidate_within_M_of_pwds,
     _assert_files_same,
     _create_password_protected_7z_archive,
+    _try_make_veracrypt_volume,
     avdu_test_vault,  # noqa: F401
     chars_without_Bash_syntax,
     file_names_and_contents,
@@ -169,7 +170,20 @@ def test_default_command_with_aegis_vault(avdu_test_vault, tmp_path):  # noqa: F
         _collate_args(2, ["7est"], avdu_test_vault),
         capture_output=True,
         check=False,
-        env={"TMPDIR": str(tmp_path), **os.environ},
+    )
+    assert result.returncode == 0
+
+
+def test_default_command_with_Veracrypt_volume(tmp_path):
+    volume = tmp_path / "test.hc"
+    password = "test"
+    # Default mount point ./mnt/veracrypt_volume{_X}
+    result = _try_make_veracrypt_volume(volume, password)
+
+    result = subprocess.run(
+        _collate_args(2, ["7est"], volume.as_posix()),
+        capture_output=True,
+        check=False,
     )
     assert result.returncode == 0
 
