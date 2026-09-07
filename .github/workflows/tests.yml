@@ -88,7 +88,8 @@ jobs:
     - name: Install dependencies
       run: |
         . ./.venv/bin/activate
-        pip install -e . --group=test
+        # Test main branch via PyPi, so we don't need to keep fiddlesticks.py updaed on this branch
+        pip install fiddlesticks --group=test
 
     - name: Run PyTest (via Coverage)
       run: |
