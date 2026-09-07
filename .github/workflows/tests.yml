@@ -94,4 +94,8 @@ jobs:
     - name: Run PyTest (via Coverage)
       run: |
         . ./.venv/bin/activate
-        coverage run -m pytest -rA -vv --tb=short tests && coverage combine && coverage report
+        # coverage run -m 
+        # Coverge is configured to mesure the code in the repo on this branch, 
+        # not the code from main we installed above from PyPi
+        pytest -rA -vv --tb=short tests
+        # && coverage combine && coverage report
