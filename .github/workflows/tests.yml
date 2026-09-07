@@ -20,7 +20,8 @@ jobs:
     steps:
     - name: Check out repo
       uses: actions/checkout@v7
-      branch: main
+      with:
+        branch: main
     
 
     - name: Check Git hasn't corrupted test data files
