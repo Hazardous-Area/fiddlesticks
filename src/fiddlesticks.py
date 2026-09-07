@@ -5,13 +5,21 @@
 
 # # Non-compliant with PEP 723:
 # optional_dependencies = [
-#   py7zr = ["py7zr"],
+#   # External 7zip, e.g.:
+#   #   sudo apt-get install -y 7zip
+#   ssh = ["bcrypt", "cryptography>=47"], # v47 min for "incorrect PW" error message from Rust code
 #   aegis = ["py-avdu"],
 #   keepassxc = ["pykeepass"],
+#   # External Veracrypt, e.g.:
+#   #   sudo add-apt-repository ppa:unit193/encryption
+#   #   sudo apt update
+#   #   sudo apt install veracrypt
+#   msoffice = ["msoffcrypto-tool"]
+#   py7zr = ["py7zr"],
 # ]
 # ///
 
-__version__ = "0.4.0.dev"
+__version__ = "0.4.0"
 
 import argparse
 import atexit

@@ -8,8 +8,9 @@ Version 0.4.0
 ## Description
 Password recovery tool, for password-encrypted files, using simple off-line brute 
 force attacks.  Password candidates are generated, using common variations 
-of a guessed password (e.g. typos and substitutions). SSH keys, Aegis archives, plus
-.7z, .kdbx, .xlsx, and .docx files, are directly supported, but 
+of a guessed password (e.g. typos and substitutions). SSH keys, Aegis archives, 
+and Veracrypt volumes, plus .7z, .kdbx, .xlsx, and .docx files, 
+are directly supported as optional dependencies.  But 
 Fiddlesticks can also call any shell command, that accepts a candidate password, 
 e.g. for Veracrypt volumes (and can pipe candidates to stdout).
 

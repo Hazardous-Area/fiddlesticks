@@ -29,15 +29,6 @@ jobs:
         sudo apt update
         sudo apt install veracrypt
 
-    # - name: Create volume
-    #   run: |
-    #     python ./tests/veracrypt/create.py
-
-    # - name: Mount volume
-    #   run: |
-    #     python ./tests/veracrypt/mount.py
-
-
     - name: Create venv
       run: |
         python3 -m venv .venv
