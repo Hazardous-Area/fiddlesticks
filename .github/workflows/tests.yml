@@ -20,6 +20,7 @@ jobs:
     steps:
     - name: Check out repo
       uses: actions/checkout@v7
+      branch: main
     
 
     - name: Check Git hasn't corrupted test data files
@@ -51,34 +52,6 @@ jobs:
         sudo apt-get install -y fuse3 libfuse3-dev
         sudo apt-get install -y ./veracrypt-console-1.26.29-Ubuntu-26.04-amd64.deb  
 
-    # - name: Create volume
-    #   run: |
-    #     python ./tests/veracrypt/create.py
-
-    # - name: Create Mount point
-    #   run: mkdir -p ./mnt/vc
-
-    # - name: Mount volume from Bash
-    #   run: >
-    #     sudo
-    #     veracrypt
-    #     --text
-    #     --password="test"
-    #     --non-interactive
-    #     --keyfiles=""
-    #     --pim=0
-    #     --protect-hidden=no
-    #     --mount
-    #     test.hc
-    #     ./mnt/vc
-
-    # - name: Unmount volume from Bash
-    #   run: veracrypt --unmount
-
-
-    # - name: Mount volume
-    #   run: |
-    #     python ./tests/veracrypt/mount.py
 
 
     - name: Create venv
@@ -88,14 +61,10 @@ jobs:
     - name: Install dependencies
       run: |
         . ./.venv/bin/activate
-        # Test main branch via PyPi, so we don't need to keep fiddlesticks.py updaed on this branch
-        pip install fiddlesticks --group=test
+        pip install -e . --group=test
+
 
     - name: Run PyTest (via Coverage)
       run: |
         . ./.venv/bin/activate
-        # coverage run -m 
-        # Coverge is configured to mesure the code in the repo on this branch, 
-        # not the code from main we installed above from PyPi
-        pytest -rA -vv --tb=short tests
-        # && coverage combine && coverage report
+        coverage run -m pytest -rA -vv --tb=short tests && coverage combine && coverage report
