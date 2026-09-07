@@ -793,7 +793,8 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         command = ns.command
 
     if (
-        command not in (
+        command
+        not in (
             make_7zip_checker,
             make_persistent_7zip_checker,
             make_subprocess_checker,
