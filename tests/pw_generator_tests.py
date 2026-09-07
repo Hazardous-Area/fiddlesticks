@@ -37,7 +37,9 @@ def test_alt_chars_candidates_generator(
     password_guess_and_num_subs: tuple[str, list[tuple[int, str]], int],
 ):
     pwd, _guesses, M = password_guess_and_num_subs
-    _total, candidates = fiddlesticks.candidate_passwords_from_alt_chars([pwd], M)
+    _total, candidates = fiddlesticks.candidate_passwords_from_alt_chars(
+        [pwd], max_subs=M
+    )
     for candidate, _num_subs in candidates:
         _assert_candidate_within_M_of_pwds(candidate, [pwd], M)
 
@@ -50,6 +52,8 @@ def test_alt_chars_candidates_generator(
     ],
 )
 def test_multiple_guesses(pwds):
-    _total, candidates = fiddlesticks.candidate_passwords_from_alt_chars(pwds, 2)
+    _total, candidates = fiddlesticks.candidate_passwords_from_alt_chars(
+        pwds, max_subs=2
+    )
     for candidate, _num_subs in candidates:
         _assert_candidate_within_M_of_pwds(candidate, pwds, 2)
