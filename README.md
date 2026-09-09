@@ -9,9 +9,10 @@ Version 0.5.0.dev
 ## Description
 Password recovery tool, for password-encrypted files, using simple off-line brute 
 force attacks.  Password candidates are generated, using common variations 
-of a guessed password (e.g. typos and substitutions). SSH keys, Aegis archives, 
-and Veracrypt volumes, plus .7z, .kdbx, .xlsx, and .docx files, 
-are directly supported as optional dependencies.  But 
+of a guessed password (e.g. typos and substitutions). SSH keys and Aegis archives, 
+plus .7z, .kdbx, .xlsx, and .docx files, 
+are directly supported as optional dependencies (Veracrypt volumes too, but they're 
+so secure, they require 45 CPU-core-seconds per guess).  But 
 Fiddlesticks can also call any shell command, that accepts a candidate password, 
 e.g. for Veracrypt volumes (and can pipe candidates to stdout).
 
@@ -167,7 +168,7 @@ At the very least, real world adversaries (posessing a stolen file or password h
 ## Benchmarks
  - Hetzner CX23 x86 4GB
  - fiddlesticks v0.5.0.dev
- - guess='correcthorsebatterystaple'
+ - guess=[`correcthorsebatterystaple`](https://xkcd.com/936/)
 
 | Num subs |Num pwds | .xlsx/s | per pwd/ms | .kdbx/s | per pwd/ms | .json/s | per pwd/ms | .7z  /s | per pwd/ms | .key /s | per pwd/ms | .hc  /s | per pwd/ms |
 |----------|:-------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|
