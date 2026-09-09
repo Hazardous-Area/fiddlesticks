@@ -138,7 +138,7 @@ def benchmark_candidate_testing(
     # Delimiter row
     output(f"\n|{'-' * (len(headers[0]) - 2)}|")
     output(f":{'-' * (len(headers[1]) - 3)}:|")
-    output("|".join(f":{'-' * 8}:|:{'-' * 10}:" for header in headers[1:]))
+    output("|".join(f":{'-' * 7}:|:{'-' * 10}:" for header in headers[2:]))
     output("|\n")
 
     for num_subs in range(min(max_num_subs, len(guess)) + 1):
@@ -164,7 +164,7 @@ def benchmark_candidate_testing(
                 printed_num_pwds = True
 
             if (per_pwd_ms * N / 1000) >= max_time_s:
-                output(f"      | {' ' * (L - 9)}|")
+                output(f"{' ':9}|{' ':{L - 11}}|")
                 continue
 
             file_name = file.as_posix()
