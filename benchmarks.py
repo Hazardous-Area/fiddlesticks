@@ -124,7 +124,7 @@ def benchmark_candidate_testing(
         with open(output_file, "at") as f:
             f.write(s)
 
-    msg = f"### Benchmarks\n - fiddlesticks v{fiddlesticks.__version__}\n - {guess=}"
+    msg = f"## Benchmarks\n - fiddlesticks v{fiddlesticks.__version__}\n - {guess=}"
     print(msg)
     output(f"{msg}\n\n")
 
@@ -182,7 +182,7 @@ def benchmark_candidate_testing(
         output("\n")
 
 
-benchmark_candidate_testing(max_num_subs=1)
+benchmark_candidate_testing()
 
 # E.g.
 # fiddlesticks_benchmarks.txt
