@@ -43,7 +43,7 @@ def benchmark_candidate_generation(
         )
 
 
-benchmark_candidate_generation(iterate=True)
+# benchmark_candidate_generation(iterate=True)
 # E.g. (correcthorsebatterystaple):
 #
 # (.venv) root@ubuntu-4gb-fsn1-1:~/fiddlesticks# python ex.py
@@ -124,30 +124,34 @@ def benchmark_candidate_testing(
         with open(output_file, "at") as f:
             f.write(s)
 
-    msg = f"Benchmarking fiddlesticks v{fiddlesticks.__version__} against {guess=}"
+    msg = f"### Benchmarks\n - fiddlesticks v{fiddlesticks.__version__}\n - {guess=}"
     print(msg)
     output(f"{msg}\n\n")
 
-    headers = [f"| {file.suffix:3}/s, per pwd/ms " for file in files]
-    headers.insert(0, "Num subs |")
+    # Markdown table format
+    headers = [f" {file.suffix:5}/s | per pwd/ms |" for file in files]
+    headers.insert(0, "| Num subs |")
     headers.insert(1, "Num pwds |")
     for header in headers:
         output(header)
-    output("\n")
-    output("-" * sum(len(header) for header in headers))
-    output("\n")
+
+    # Delimiter row
+    output(f"\n|{'-' * (len(headers[0]) - 2)}|")
+    output(f":{'-' * (len(headers[1]) - 3)}:|")
+    output("|".join((f":{'-' * 8}:|:{'-'*10}:" for header in headers[1:])))
+    output("|\n")
 
     for num_subs in range(min(max_num_subs, len(guess)) + 1):
         L = len(headers[0])
 
-        output(f" {num_subs:{L - 3}}  ")
+        output(f"|{num_subs:{L - 3}} |")
 
         printed_num_pwds = False
 
         for header, (file, per_pwd_ms) in zip(headers[2:], files.items()):
             L = len(header)
 
-            # For num_subs = 8, cacheing all candidates requires 8GB,
+            # For num_subs = 8, caching all candidates requires 8GB,
             # so make a new iterator for each file
             N, pwds = fiddlesticks.candidate_passwords_from_alt_chars(
                 [guess],
@@ -156,11 +160,11 @@ def benchmark_candidate_testing(
             )
 
             if not printed_num_pwds:
-                output(f" {N:{len(headers[1]) - 3}}  ")
+                output(f" {N:{len(headers[1]) - 3}} |")
                 printed_num_pwds = True
 
             if (per_pwd_ms * N / 1000) >= max_time_s:
-                output(" " * L)
+                output(f"      | {' '*(L - 9)}|")
                 continue
 
             file_name = file.as_posix()
@@ -173,12 +177,12 @@ def benchmark_candidate_testing(
 
             per_pwd_ms = 1000 * t_s // N
             files[file] = per_pwd_ms
-            output(f" {int(t_s):5}  {per_pwd_ms:{L - 9}} ")
+            output(f"{int(t_s):9}|{per_pwd_ms:{L - 11}}|")
 
         output("\n")
 
 
-benchmark_candidate_testing()
+benchmark_candidate_testing(max_num_subs=1)
 
 # E.g.
 # fiddlesticks_benchmarks.txt
