@@ -21,7 +21,7 @@ jobs:
     - name: Check out repo
       uses: actions/checkout@v7
       with:
-        branch: main
+        ref: main
     
 
     - name: Check Git hasn't corrupted test data files
