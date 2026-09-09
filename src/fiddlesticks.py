@@ -343,7 +343,9 @@ def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwa
     stdout = cast(io.TextIOBase, proc.stdout)
 
     def checker(candidate: str) -> bool:
+        # Send data down the pipe
         stdin.write(f"{candidate}\n")
+        stdin.flush()
 
         # Read the response back
         response = stdout.readline().strip()

@@ -16,8 +16,10 @@ from fiddlesticks import IS_WINDOWS
 
 from .helpers import (
     BI_MAP,
+    DOCX_FILE,
     KDBX_TEST_VAULT,
     SEVEN_ZIP_TEST_ARCHIVE,
+    XLSX_FILE,
     _assert_candidate_within_M_of_pwds,
     _assert_files_same,
     _create_password_protected_7z_archive,
@@ -172,6 +174,33 @@ def test_default_command_with_aegis_vault(avdu_test_vault, tmp_path):  # noqa: F
         check=False,
     )
     assert result.returncode == 0
+
+
+def test_default_command_with_xlsx():
+    result = subprocess.run(
+        _collate_args(2, ["7est"], XLSX_FILE.as_posix()),
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0
+
+
+def test_default_command_with_docx():
+    result = subprocess.run(
+        _collate_args(2, ["7est"], DOCX_FILE.as_posix()),
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0
+
+
+def test_default_command_with_docx_bad_guess_and_verbose():
+    result = subprocess.run(
+        _collate_args(1, ["abcd"], "-v", DOCX_FILE.as_posix()),
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 1
 
 
 def test_default_command_with_Veracrypt_volume(tmp_path):
