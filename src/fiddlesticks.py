@@ -19,7 +19,7 @@
 # ]
 # ///
 
-__version__ = "0.4.0"
+__version__ = "0.5.0.dev"
 
 import argparse
 import atexit
@@ -147,8 +147,9 @@ def _candidates_from_num_subs(
 def _candidates_from_alts_dict(
     guesses_alts: dict[str, list[list[str]]],
     max_subs: int,
+    min_subs: int = 0,
 ) -> Iterator[tuple[str, int]]:
-    for num_subs in range(max_subs + 1):
+    for num_subs in range(min_subs, max_subs + 1):
         # Yield candidates derived from each guess using
         # a not quite Round robin order (that restarts
         # from the earliest iterator after one is exhausted).
@@ -174,6 +175,7 @@ def _candidates_from_alts_dict(
 
 def candidate_passwords_from_alt_chars(
     guesses: list[str],
+    min_subs: int = 0,
     max_subs: int = 2,
     alt_chars: list[list[list[str]]] | None = None,
     alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
@@ -191,10 +193,14 @@ def candidate_passwords_from_alt_chars(
     for alts in guesses_alts.values():
         lengths = [len(chars) for chars in alts]
         total_num_candidates += sum(
-            _calculate_total(lengths, M) for M in range(max_subs + 1)
+            _calculate_total(lengths, M) for M in range(min_subs, max_subs + 1)
         )
-
-    return total_num_candidates, _candidates_from_alts_dict(guesses_alts, max_subs)
+    candidates_it = _candidates_from_alts_dict(
+        guesses_alts,
+        min_subs=min_subs,
+        max_subs=max_subs,
+    )
+    return total_num_candidates, candidates_it
 
 
 def possibly_output_found_password(
@@ -582,6 +588,7 @@ def check_passwords_sequentially(
                 flush=True,
             )
         else:
+            # verbosity == 1 or (verbosity ==2 and not print_passwords)
             print_to_stderr(
                 f"{i}{out_of_total}, num substitutions={num_subs}", flush=True
             )
@@ -627,7 +634,16 @@ parser.add_argument(
     default=2,
     help=(
         "The maximum number of character substitutions "
-        "that will be applied to the guess"
+        "that will be applied to the guess.  Default: 2"
+    ),
+)
+parser.add_argument(
+    "--min-subs",
+    type=int,
+    default=0,
+    help=(
+        "The minimum number of character substitutions "
+        "that will be applied to the guess. Default: 0"
     ),
 )
 parser.add_argument("--verbosity", "-v", action="count", default=0)
@@ -864,7 +880,10 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         )
 
     total, candidates = ns.password_generator(
-        guesses=password_guesses, max_subs=ns.max_subs, alt_char_map=alt_char_map
+        guesses=password_guesses,
+        min_subs=ns.min_subs,
+        max_subs=ns.max_subs,
+        alt_char_map=alt_char_map,
     )
     checker = command(*extras, **kwargs)
 
@@ -881,6 +900,8 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         print_to_stderr(
             "\n\nCould not find password. Try a different guess, or increasing max substitutions (-N) ? "
         )
+        if ns.verbosity >= 1:
+            print_to_stderr(f"Search took: {t1 - t0:.3f} seconds")
         return 1
 
     password, i = result

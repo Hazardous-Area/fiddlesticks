@@ -3,7 +3,7 @@
 ![Tests passing](https://github.com/Hazardous-Area/fiddlesticks/actions/workflows/tests.yml/badge.svg)
 ![Code qual](https://github.com/Hazardous-Area/fiddlesticks/actions/workflows/lint.yml/badge.svg)
 
-Version 0.4.0
+Version 0.5.0.dev
 
 ## Description
 Password recovery tool, for password-encrypted files, using simple off-line brute 
@@ -17,10 +17,9 @@ e.g. for Veracrypt volumes (and can pipe candidates to stdout).
 ### Raison d'etre
  - Password-protected file owners recovering their own password themselves, as long as 
 they can still recall a rough guess for their password, might only need to test 
-every candidate password that's similar enough to the guess.  
+every candidate password that's similar enough to their best guess.  
  - This may be a much faster and cheaper computation
-than the one an adversary must do, without such a guess, but in possession 
-of a stolen password protected file[^0].
+than the one an adversary must do, without such a guess.
 
 ### Warning
 Strictly speaking, Fiddlesticks is a password-protected file recovery tool.  Use it to 
@@ -31,7 +30,7 @@ Fiddlesticks does not print the password it finds (or any candidates) unless `-P
 (or if using `--pipe` with no pipe).
 
 ### "Back of envelope" sketch 'calculation'
- - Attackers targetting a truly[^0] random password, must try up to `2**N` 
+ - Attackers targetting a truly random password[^0], must try up to `2**N` 
  candidate passwords (for each bit length `N` being considered). 
  - Specifically, password owners may only need to consider every candidate within some 
  maximum [Weighted-Levenshtein distance](https://en.wikipedia.org/wiki/Edit_distance#Types_of_edit_distance) 
@@ -46,7 +45,7 @@ archive can also do so - the password wasn't strong enough.
  (e.g. this could indicate that the starting guess was wrong).
 
 ### Design and security notes
-*"FAQ: Why the heck should anyone in their right mind trust this with their password?"*
+*"FAQ: Why the heck would anyone in their right mind trust Fiddlesticks with their password?!"*
  - Any similar 3rd party password cracking service based on 'best guess' passwords, requires 
 the user to share the guesses for their passwords with the service.  Even if the password
 was not used for anything else, sharing even guesses for secret credentials with 3rd parties, 
@@ -87,7 +86,7 @@ Full disclaimer:  Fiddlesticks does actually contain 8 lines of Bash in a string
 literal (to avoid the overhead of `subprocess.run` for every single candidate to be 
 tested, and to demonstrate how any command line program could read 
 password candidates from stdin).  Otherwise we hope the answers to all the other questions
-with regards to Fiddlesticks, are all reassuring.
+with regards to Fiddlesticks, are reassuring.
 
 ### Usage
 ```
