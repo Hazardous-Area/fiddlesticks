@@ -1,5 +1,6 @@
 # Fiddlesticks!
 *"Aaaagh!  I forgot my 7zip password"* - James (more times than he cares to remember).
+
 ![Tests passing](https://github.com/Hazardous-Area/fiddlesticks/actions/workflows/tests.yml/badge.svg)
 ![Code qual](https://github.com/Hazardous-Area/fiddlesticks/actions/workflows/lint.yml/badge.svg)
 
@@ -165,10 +166,6 @@ At the very least, real world adversaries (posessing a stolen file or password h
 
 ## Benchmarks
  - Hetzner CX23 x86 4GB
- - fiddlesticks v0.5.0.dev
- - guess='correcthorsebatterystaple'
-
-### Benchmarks
  - fiddlesticks v0.5.0.dev
  - guess='correcthorsebatterystaple'
 
