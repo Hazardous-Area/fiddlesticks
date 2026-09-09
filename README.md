@@ -168,9 +168,13 @@ At the very least, real world adversaries (posessing a stolen file or password h
  - fiddlesticks v0.5.0.dev
  - guess='correcthorsebatterystaple'
 
+### Benchmarks
+ - fiddlesticks v0.5.0.dev
+ - guess='correcthorsebatterystaple'
+
 | Num subs |Num pwds | .xlsx/s | per pwd/ms | .kdbx/s | per pwd/ms | .json/s | per pwd/ms | .7z  /s | per pwd/ms | .key /s | per pwd/ms | .hc  /s | per pwd/ms |
 |----------|:-------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|
 |        0 |       1 |        0|        71.0|        0|       110.0|        0|       148.0|        0|       221.0|        0|       261.0|       45|     45610.0|
 |        1 |      42 |        2|        59.0|        3|        90.0|        6|       147.0|        9|       230.0|       10|       257.0|         |            |
 |        2 |     842 |       46|        55.0|       76|        90.0|      121|       144.0|      186|       221.0|      216|       257.0|         |            |
-|        3 |   10724 |      573|        53.0|
+|        3 |   10724 |      573|        53.0|      991|        92.0|         |            |         |            |         |            |         |            |
