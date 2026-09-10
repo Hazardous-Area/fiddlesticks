@@ -14,7 +14,7 @@ from fiddlesticks import (
     IS_WINDOWS,
     _get_hopefully_incorrect_password,
     cli,
-    possibly_output_found_password,
+    handle_found_password_output,
 )
 
 from .helpers import (
@@ -44,7 +44,7 @@ def test_get_hopefully_incorrect_password_username_not_found(capsys):
     "print_passwords",
     [True, False],
 )
-def test_possibly_output_found_password_no_time(
+def test_handle_found_password_output_no_time(
     print_passwords: bool,
     capsys,
 ):
@@ -53,7 +53,7 @@ def test_possibly_output_found_password_no_time(
     # This currently only gets called without a calculation time
     # if the password was the user's username, or "password123",
     # when using an SSH key password checker.
-    possibly_output_found_password(
+    handle_found_password_output(
         password=password,
         i=i,
         t=None,
@@ -64,6 +64,9 @@ def test_possibly_output_found_password_no_time(
     _assert_output_on_found_password(password, i, print_passwords, stdout, stderr)
 
 
+@pytest.mark.skipif(
+    IS_WINDOWS, reason="I haven't figured out the OpenSSH CLI on Windows yet"
+)
 def test_are_error_strings_in_cryptography_unchanged(tmp_path):
     keyfiles_and_pwds = _try_make_ssh_key_files(tmp_path, "testtesttest")
     n = 0

@@ -145,6 +145,22 @@ def passwords_guesses_and_num_subs(
     return password, guess, num_subs
 
 
+@composite
+def passwords_guesses_first_index_and_num_subs(
+    draw,
+    max_subs: int = 3,
+    password_chars: set[str] = base_password_chars,
+):
+    pwd, guess, num_subs = draw(
+        passwords_guesses_and_num_subs(max_subs, password_chars)
+    )
+    guesses_alts = fiddlesticks._make_guesses_alt_chars([guess], BI_MAP)
+    sub_totals = fiddlesticks._calculate_sub_totals(guesses_alts, max_subs=num_subs)
+    num_guesses = sub_totals[num_subs][guess]
+    first_index = draw(integers(min_value=0, max_value=num_guesses - 1))
+    return pwd, guess, first_index, num_subs
+
+
 def _candidate_is_within_M_of_pwd(
     candidate: str,
     pwd: str,
