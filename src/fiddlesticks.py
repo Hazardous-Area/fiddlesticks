@@ -144,33 +144,29 @@ def _candidates_from_num_subs(
             yield "".join(candidate_password), num_subs
 
 
+# https://docs.python.org/3/license.html#zero-clause-bsd-license-for-code-in-the-python-documentation
+# https://docs.python.org/3/library/itertools.html#itertools-recipes
+def roundrobin(*iterables):
+    "Visit input iterables in a cycle until each is exhausted."
+    # roundrobin('ABC', 'D', 'EF') → A D E B F C
+    # Algorithm credited to George Sakkis
+    iterators = map(iter, iterables)
+    for num_active in range(len(iterables), 0, -1):
+        iterators = cycle(islice(iterators, num_active))
+        yield from map(next, iterators)
+
+
 def _candidates_from_alts_dict(
     guesses_alts: dict[str, list[list[str]]],
     max_subs: int,
     min_subs: int = 0,
 ) -> Iterator[tuple[str, int]]:
     for num_subs in range(min_subs, max_subs + 1):
-        # Yield candidates derived from each guess using
-        # a not quite Round robin order (that restarts
-        # from the earliest iterator after one is exhausted).
-        iterators = [
+        iterators = (
             _candidates_from_num_subs(guess, num_subs, alts)
             for guess, alts in guesses_alts.items()
-        ]
-        while iterators:
-            # Coverage would like to see tests covering iterators being empty,
-            # which is not reachable within a while iterators: loop.
-            for i, iterator in itertools.cycle(
-                enumerate(iterators)
-            ):  # pragma: no branch
-                # More itertools' roundrobin just breaks out of the loop
-                # using a next call with no fallback value, to raise StopIteration
-                candidate = next(iterator, None)
-                if candidate is None:
-                    break
-                yield candidate
-            # Get rid of exhausted iterator
-            iterators.pop(i)
+        )
+        yield from roundrobin(iterators)
 
 
 def candidate_passwords_from_alt_chars(
@@ -179,7 +175,7 @@ def candidate_passwords_from_alt_chars(
     max_subs: int = 2,
     alt_chars: list[list[list[str]]] | None = None,
     alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
-) -> tuple[int, Iterator[tuple[str, int]]]:
+) -> tuple[int, Iterator[tuple[int, tuple[str, int]]]]:
 
     overrides = [None for guess in guesses] if alt_chars is None else alt_chars
     guesses_alts: dict[str, list[list[str]]]
@@ -200,7 +196,7 @@ def candidate_passwords_from_alt_chars(
         min_subs=min_subs,
         max_subs=max_subs,
     )
-    return total_num_candidates, candidates_it
+    return total_num_candidates, enumerate(candidates_it)
 
 
 def possibly_output_found_password(
@@ -549,7 +545,7 @@ def make_Veracrypt_checker(file: os.PathLike, **kwargs):
 
 
 def check_passwords_sequentially(
-    candidates: Iterable[tuple[str, int]],
+    candidates: Iterable[tuple[int, tuple[str, int]]],
     test_func: Callable[[str], bool],
     verbosity: int = 0,
     update_every: int | None = None,
@@ -567,7 +563,7 @@ def check_passwords_sequentially(
         update_every = min(update_every, 1000)
 
     last_printed_num_subs = 0
-    for i, (candidate, num_subs) in enumerate(candidates, start=1):
+    for i, (candidate, num_subs) in candidates:
         if test_func(candidate):
             return candidate, i
 

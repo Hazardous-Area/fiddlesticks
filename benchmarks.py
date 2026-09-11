@@ -12,7 +12,7 @@ guess = "correcthorsebatterystaple"
 def f(x, guess=guess):
     N, pwds = fiddlesticks.candidate_passwords_from_alt_chars([guess], max_subs=x)
     print(f"{N=} ", end="", flush=True)
-    cands = [pwd for (pwd, i) in pwds]
+    cands = [pwd for i, (pwd, n) in pwds]
     print(f"{len(cands)=}")
     return cands
 
