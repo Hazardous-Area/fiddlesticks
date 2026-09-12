@@ -35,7 +35,7 @@ import textwrap
 import time
 import warnings
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from itertools import combinations, cycle, islice, product
 from pathlib import Path
 from typing import cast
@@ -123,25 +123,37 @@ def _combine_maps(
 SHIFT_AND_LEET_BI_MAP = _combine_maps([SHIFT_MAP, LEET_SPEAK])
 
 
+def _candidate_from_positions_and_selected_alts(
+    guess: str,
+    char_indexed_alts: dict[int, list[str]],
+    positions: Sequence[int],
+    selected: Sequence[str],
+) -> str:
+    candidate_password = list(guess)
+    for i, replacement in zip(positions, selected):
+        candidate_password[i] = replacement
+    return "".join(candidate_password)
+
+
 def _candidates_from_num_subs(
     guess: str,
     num_subs: int,
-    alts: list[list[str]],
+    char_indexed_alts: dict[int, list[str]],
 ) -> Iterator[tuple[str, int]]:
     if num_subs == 0:
         yield guess, 0
         return
-    for positions in combinations(range(len(guess)), num_subs):
-        alts_at_positions = [alts[i] for i in positions if alts[i]]
-
-        if len(alts_at_positions) != num_subs:
-            continue
+    for positions in combinations(char_indexed_alts, num_subs):
+        alts_at_positions = [char_indexed_alts[i] for i in positions]
 
         for selected in product(*alts_at_positions):
-            candidate_password = list(guess)
-            for i, replacement in zip(positions, selected):
-                candidate_password[i] = replacement
-            yield "".join(candidate_password), num_subs
+            candidate_password = _candidate_from_positions_and_selected_alts(
+                guess,
+                char_indexed_alts,
+                positions,
+                selected,
+            )
+            yield candidate_password, num_subs
 
 
 # https://docs.python.org/3/license.html#zero-clause-bsd-license-for-code-in-the-python-documentation
@@ -157,7 +169,7 @@ def roundrobin(*iterables):
 
 
 def _candidates_from_alts_dict(
-    guesses_alts: dict[str, list[list[str]]],
+    guesses_alts: dict[str, dict[int, list[str]]],
     max_subs: int,
     min_subs: int = 0,
 ) -> Iterator[tuple[str, int]]:
@@ -171,25 +183,28 @@ def _candidates_from_alts_dict(
 
 def _make_guesses_alt_chars(
     guesses: list[str],
-    alt_chars: list[list[list[str]]] | None = None,
     alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
-) -> dict[str, list[list[str]]]:
-    overrides = [None for guess in guesses] if alt_chars is None else alt_chars
+) -> dict[str, dict[int, list[str]]]:
     return {
-        # In case alt_char_map[c] is a str
-        guess: [list(alt_char_map[c]) for c in guess] if alts is None else alts
-        for guess, alts in zip(guesses, overrides)
+        guess: {
+            #  list() in case alt_char_map[c] is a str
+            i: list(alt_char_map[c])
+            for i, c in enumerate(guess)
+            if c in alt_char_map
+        }
+        for guess in guesses
     }
 
 
 def _calculate_sub_totals(
-    guesses_alts: dict[str, list[list[str]]],
+    guesses_alts: dict[str, dict[int, list[str]]],
     min_subs: int = 0,
     max_subs: int = 2,
 ) -> dict[int, dict[str, int]]:
 
     lengths = {
-        guess: [len(chars) for chars in alts] for guess, alts in guesses_alts.items()
+        guess: [len(chars) for chars in alts.values()]
+        for guess, alts in guesses_alts.items()
     }
     return {
         num_subs: {
@@ -205,7 +220,6 @@ def candidate_passwords_from_alt_chars(
     starting_index: int = 0,
     min_subs: int = 0,
     max_subs: int = 2,
-    alt_chars: list[list[list[str]]] | None = None,
     alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
 ) -> tuple[int, Iterator[tuple[int, tuple[str, int]]]]:
 
@@ -217,7 +231,7 @@ def candidate_passwords_from_alt_chars(
             # "or --password-generator=indexable"
         )
 
-    guesses_alts = _make_guesses_alt_chars(guesses, alt_chars, alt_char_map)
+    guesses_alts = _make_guesses_alt_chars(guesses, alt_char_map)
 
     sub_totals = _calculate_sub_totals(guesses_alts, min_subs, max_subs)
     total_num_candidates = sum(
