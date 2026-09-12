@@ -1,6 +1,58 @@
+from collections import defaultdict
 from multiprocessing import Event, Queue
 import queue
-from typing import NamedTuple, Callable, Self
+from typing import NamedTuple, Callable, Self, Iterator
+
+
+from fiddlesticks import SHIFT_AND_LEET_BI_MAP
+
+# Num subs
+# Guess number
+# -- Compute indices with alts under given map--
+# Indices combo number
+# -- Compute list of alts --
+# Alts product number
+
+
+
+
+
+def indexable_candidate_passwords_from_alt_chars(
+    guesses: list[str],
+    starting_index: int = 0,
+    min_subs: int = 0,
+    max_subs: int = 2,
+    alt_chars: list[list[list[str]]] | None = None,
+    alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
+) -> tuple[int, Iterator[tuple[int, tuple[str, int]]]]:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class GuessData(NamedTuple):
     guesses: list[str]

@@ -25,7 +25,7 @@ import argparse
 import atexit
 import getpass
 import io
-import itertools
+from itertools import islice, cycle, combinations, product
 import json
 import os
 import string
@@ -131,13 +131,13 @@ def _candidates_from_num_subs(
     if num_subs == 0:
         yield guess, 0
         return
-    for positions in itertools.combinations(range(len(guess)), num_subs):
+    for positions in combinations(range(len(guess)), num_subs):
         alts_at_positions = [alts[i] for i in positions if alts[i]]
 
         if len(alts_at_positions) != num_subs:
             continue
 
-        for selected in itertools.product(*alts_at_positions):
+        for selected in product(*alts_at_positions):
             candidate_password = list(guess)
             for i, replacement in zip(positions, selected):
                 candidate_password[i] = replacement
@@ -169,28 +169,64 @@ def _candidates_from_alts_dict(
         yield from roundrobin(iterators)
 
 
+def _make_guesses_alt_chars(
+    guesses: list[str],
+    alt_chars: list[list[list[str]]] | None = None,
+    alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
+) -> dict[str, list[list[str]]]:
+    overrides = [None for guess in guesses] if alt_chars is None else alt_chars
+    return {
+        # In case alt_char_map[c] is a str
+        guess: [list(alt_char_map[c]) for c in guess] if alts is None else alts
+        for guess, alts in zip(guesses, overrides)
+    }
+
+
+def _calculate_sub_totals(
+    guesses_alts: dict[str, list[list[str]]],
+    min_subs: int = 0,
+    max_subs: int = 2,
+    ) -> list[list[int]]:
+    sub_totals: dict[int, dict[str, int]]
+    total_num_candidates = 0
+    lengths = {
+        guess : [len(chars) for chars in alts]
+        for guess, alts in guesses_alts.items()
+    }
+    return {
+        num_subs : {
+            guess: _calculate_total(alts_lengths, M)
+            for guess, alts_lengths in lengths.items()
+        }
+        for num_subs in range(min_subs, max_subs + 1)
+    }
+
+
 def candidate_passwords_from_alt_chars(
     guesses: list[str],
+    starting_index: int = 0,
     min_subs: int = 0,
     max_subs: int = 2,
     alt_chars: list[list[list[str]]] | None = None,
     alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
 ) -> tuple[int, Iterator[tuple[int, tuple[str, int]]]]:
 
-    overrides = [None for guess in guesses] if alt_chars is None else alt_chars
-    guesses_alts: dict[str, list[list[str]]]
-    guesses_alts = {
-        # In case alt_char_map[c] is a str
-        guess: [list(alt_char_map[c]) for c in guess] if alts is None else alts
-        for guess, alts in zip(guesses, overrides)
-    }
-
-    total_num_candidates = 0
-    for alts in guesses_alts.values():
-        lengths = [len(chars) for chars in alts]
-        total_num_candidates += sum(
-            _calculate_total(lengths, M) for M in range(min_subs, max_subs + 1)
+    if starting_index != 0:
+        raise ValueError(
+            "This candidate generator is not an indexable iterator. "
+            "It must always start from scratch; it does not support shortcuts. "
+            "--starting-index must be used with --resume "
+            # "or --password-generator=indexable"
         )
+
+
+    guesses_alts = _make_guesses_alt_chars(guesses, alt_chars, alt_char_map)
+
+    sub_totals = _calculate_sub_totals(guesses_alts, min_subs, max_subs)
+    total_num_candidates = sum(
+        sum(guess_totals.values()) 
+        for guess_totals in sub_totals.values()
+    )
     candidates_it = _candidates_from_alts_dict(
         guesses_alts,
         min_subs=min_subs,
@@ -624,6 +660,22 @@ def _default_factory_selector(*args: str):
 parser = argparse.ArgumentParser(prog="fiddlesticks")
 parser.suggest_on_error = True  # type: ignore
 parser.add_argument(
+    "--resume",
+    type=bool,
+    default=False,
+    help=(
+        "Try to resume a previous interrupted search, from a saved index. "
+    ),
+)
+parser.add_argument(
+    "--starting-index",
+    type=int,
+    default=0,
+    help=(
+        "Try to resume a previous interrupted search, from a saved index. "
+    ),
+)
+parser.add_argument(
     "--max-subs",
     "-N",
     type=int,
@@ -850,6 +902,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
             password_guesses.append(password_guess)
 
     extras = kwargs.pop("extras")
+    _resume = kwargs.pop("resume")
 
     if ns.command is None:
         command = _default_factory_selector(*extras)
@@ -876,6 +929,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         )
 
     total, candidates = ns.password_generator(
+        starting_index=ns.starting_index,
         guesses=password_guesses,
         min_subs=ns.min_subs,
         max_subs=ns.max_subs,
