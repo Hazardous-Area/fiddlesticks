@@ -25,7 +25,6 @@ import argparse
 import atexit
 import getpass
 import io
-from itertools import islice, cycle, combinations, product
 import json
 import os
 import string
@@ -37,6 +36,7 @@ import time
 import warnings
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator
+from itertools import combinations, cycle, islice, product
 from pathlib import Path
 from typing import cast
 
@@ -95,7 +95,7 @@ def print_to_stderr(*objects, **kwargs):
     print(*objects, file=sys.stderr, **kwargs)
 
 
-def _calculate_total(lengths, M):
+def _calculate_total_from_alts_lengths(lengths, M):
     # dp[j] = sum of products for choosing j items
     dp = [0] * (M + 1)
     dp[0] = 1
@@ -186,16 +186,14 @@ def _calculate_sub_totals(
     guesses_alts: dict[str, list[list[str]]],
     min_subs: int = 0,
     max_subs: int = 2,
-    ) -> list[list[int]]:
-    sub_totals: dict[int, dict[str, int]]
-    total_num_candidates = 0
+) -> dict[int, dict[str, int]]:
+
     lengths = {
-        guess : [len(chars) for chars in alts]
-        for guess, alts in guesses_alts.items()
+        guess: [len(chars) for chars in alts] for guess, alts in guesses_alts.items()
     }
     return {
-        num_subs : {
-            guess: _calculate_total(alts_lengths, M)
+        num_subs: {
+            guess: _calculate_total_from_alts_lengths(alts_lengths, num_subs)
             for guess, alts_lengths in lengths.items()
         }
         for num_subs in range(min_subs, max_subs + 1)
@@ -219,13 +217,11 @@ def candidate_passwords_from_alt_chars(
             # "or --password-generator=indexable"
         )
 
-
     guesses_alts = _make_guesses_alt_chars(guesses, alt_chars, alt_char_map)
 
     sub_totals = _calculate_sub_totals(guesses_alts, min_subs, max_subs)
     total_num_candidates = sum(
-        sum(guess_totals.values()) 
-        for guess_totals in sub_totals.values()
+        sum(guess_totals.values()) for guess_totals in sub_totals.values()
     )
     candidates_it = _candidates_from_alts_dict(
         guesses_alts,
@@ -663,17 +659,13 @@ parser.add_argument(
     "--resume",
     type=bool,
     default=False,
-    help=(
-        "Try to resume a previous interrupted search, from a saved index. "
-    ),
+    help=("Try to resume a previous interrupted search, from a saved index. "),
 )
 parser.add_argument(
     "--starting-index",
     type=int,
     default=0,
-    help=(
-        "Try to resume a previous interrupted search, from a saved index. "
-    ),
+    help=("Try to resume a previous interrupted search, from a saved index. "),
 )
 parser.add_argument(
     "--max-subs",

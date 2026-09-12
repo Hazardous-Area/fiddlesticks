@@ -14,9 +14,6 @@ from fiddlesticks import SHIFT_AND_LEET_BI_MAP
 # Alts product number
 
 
-
-
-
 def indexable_candidate_passwords_from_alt_chars(
     guesses: list[str],
     starting_index: int = 0,
@@ -25,33 +22,7 @@ def indexable_candidate_passwords_from_alt_chars(
     alt_chars: list[list[list[str]]] | None = None,
     alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
 ) -> tuple[int, Iterator[tuple[int, tuple[str, int]]]]:
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    pass
 
 
 class GuessData(NamedTuple):
@@ -60,7 +31,7 @@ class GuessData(NamedTuple):
     num_guesses_left: int
     guess_index: int
     guess_char_indices_combo: list[int]
-    char_alts_indices: list[int] # from product
+    char_alts_indices: list[int]  # from product
 
     def to_string() -> str:
         raise NotImplemented
@@ -77,7 +48,7 @@ def _make_worker_loop_body(
     guess_indices: Queue[int],
     failed_indices: Queue[int],
     checker: Callable[[str], bool],
-    ):
+):
     def work():
         if pw_found.is_set():
             return False
@@ -97,14 +68,16 @@ def _make_worker_loop_body(
 
     return work()
 
+
 def make_worker(
     pw_found: Event,
     guess_indices: Queue[int],
     failed_indices: Queue[int],
     checker: Callable[[str], bool],
-    ):
+):
 
     work = _make_worker_loop_body(pw_found, guess_indices, failed_indices, checker)
+
     def worker():
         while work():
             pass
@@ -117,8 +90,8 @@ def parent(
     guess_indices_it,
     N: int = 0,
     initial_guess_index: int = 0,
-    min_queue_size = 1_000,
-    max_queue_size = 10_000,
+    min_queue_size=1_000,
+    max_queue_size=10_000,
 ):
 
     pw_found = Event()
@@ -126,13 +99,14 @@ def parent(
     failed_indices = Queue[int](maxsize=max_queue_size)
     N = 16
 
-    workers = [make_worker(pw_found, guesses, failed_indices, checker) for _ in range(N)]
+    workers = [
+        make_worker(pw_found, guesses, failed_indices, checker) for _ in range(N)
+    ]
     parent_work = _make_worker_loop_body(pw_found, guesses, failed_indices, checker)
 
     unqueued_candidates = True
 
     while not pw_found.is_set():
-
         approx_queue_size = guess_indices.qsize()
         if unqueued_candidates and approx_queue_size <= min_queue_size:
             # Or while workers not timed out
@@ -154,5 +128,3 @@ def parent(
         more_work = parent_work()
         if not more_work:
             break
-
-
