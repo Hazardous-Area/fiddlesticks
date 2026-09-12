@@ -123,16 +123,23 @@ def _combine_maps(
 SHIFT_AND_LEET_BI_MAP = _combine_maps([SHIFT_MAP, LEET_SPEAK])
 
 
-def _candidate_from_positions_and_selected_alts(
-    guess: str,
+def _all_positions_and_alts(
+    num_subs: int,
     char_indexed_alts: dict[int, list[str]],
-    positions: Sequence[int],
+) -> Iterator[dict[int, list[str]]]:
+    for positions in combinations(char_indexed_alts, num_subs):
+        yield {i: char_indexed_alts[i] for i in positions}
+
+
+def _candidate_from_selected_alts(
+    guess: str,
     selected: Sequence[str],
+    positions_and_alts: dict[int, list[str]],
 ) -> str:
-    candidate_password = list(guess)
-    for i, replacement in zip(positions, selected):
-        candidate_password[i] = replacement
-    return "".join(candidate_password)
+    candidate = list(guess)
+    for i, replacement in zip(positions_and_alts, selected):
+        candidate[i] = replacement
+    return "".join(candidate)
 
 
 def _candidates_from_num_subs(
@@ -143,17 +150,12 @@ def _candidates_from_num_subs(
     if num_subs == 0:
         yield guess, 0
         return
-    for positions in combinations(char_indexed_alts, num_subs):
-        alts_at_positions = [char_indexed_alts[i] for i in positions]
-
-        for selected in product(*alts_at_positions):
-            candidate_password = _candidate_from_positions_and_selected_alts(
-                guess,
-                char_indexed_alts,
-                positions,
-                selected,
+    for positions_and_alts in _all_positions_and_alts(num_subs, char_indexed_alts):
+        for selected in product(*positions_and_alts.values()):
+            yield (
+                _candidate_from_selected_alts(guess, selected, positions_and_alts),
+                num_subs,
             )
-            yield candidate_password, num_subs
 
 
 # https://docs.python.org/3/license.html#zero-clause-bsd-license-for-code-in-the-python-documentation
