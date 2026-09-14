@@ -8,6 +8,7 @@ from typing import NamedTuple, Callable, Self, Iterator
 
 from fiddlesticks import (
     SHIFT_AND_LEET_BI_MAP,
+    _all_positions_and_alts,
     _calculate_sub_totals,
     _make_guesses_alt_chars,
     _candidate_from_selected_alts,

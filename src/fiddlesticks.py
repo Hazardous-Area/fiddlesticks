@@ -158,29 +158,54 @@ def _candidates_from_num_subs(
             )
 
 
-# https://docs.python.org/3/license.html#zero-clause-bsd-license-for-code-in-the-python-documentation
-# https://docs.python.org/3/library/itertools.html#itertools-recipes
-def roundrobin(*iterables):
-    "Visit input iterables in a cycle until each is exhausted."
-    # roundrobin('ABC', 'D', 'EF') → A D E B F C
-    # Algorithm credited to George Sakkis
-    iterators = map(iter, iterables)
-    for num_active in range(len(iterables), 0, -1):
-        iterators = cycle(islice(iterators, num_active))
-        yield from map(next, iterators)
+# # https://docs.python.org/3/license.html#zero-clause-bsd-license-for-code-in-the-python-documentation
+# # https://docs.python.org/3/library/itertools.html#itertools-recipes
+# def roundrobin(*iterables):
+#     "Visit input iterables in a cycle until each is exhausted."
+#     # roundrobin('ABC', 'D', 'EF') → A D E B F C
+#     # Algorithm credited to George Sakkis
+#     iterators = map(iter, iterables)
+#     for num_active in range(len(iterables), 0, -1):
+#         iterators = cycle(islice(iterators, num_active))
+#         yield from map(next, iterators)
 
 
-def _candidates_from_alts_dict(
+# def _candidates_from_alts_dict(
+#     guesses_alts: dict[str, dict[int, list[str]]],
+#     first_index: int = 0,
+#     num_subs: int,
+# ) -> Iterator[tuple[str, int]]:
+#     iterators = (
+#         _candidates_from_num_subs(guess, num_subs, alts)
+#         for guess, alts in guesses_alts.items()
+#     )
+#     yield from roundrobin(iterators)
+
+def _roundrobin_all_guesses(
     guesses_alts: dict[str, dict[int, list[str]]],
-    max_subs: int,
-    min_subs: int = 0,
+    guesses_sub_totals: dict[str, int],
+    first_index: int = 0,
+    num_subs: int,
 ) -> Iterator[tuple[str, int]]:
-    for num_subs in range(min_subs, max_subs + 1):
-        iterators = (
-            _candidates_from_num_subs(guess, num_subs, alts)
-            for guess, alts in guesses_alts.items()
-        )
-        yield from roundrobin(iterators)
+    
+    sorted_iterator_lengths = sorted((n, i) for i, n in enumerate(guesses_sub_totals.values()))
+
+    # Add items yielded by Round Robin, allowing for removal of exhausted iterators
+    while sorted_iterator_lengths:
+        smallest_iterator_length = sorted_iterator_lengths[0][0]
+        num_items_until_smallest_iterators_exhausted = smallest_iterator_length * len(sorted_iterator_lengths)
+        if starting_index < sub_total + num_items_until_smallest_iterators_exhausted:
+            break
+        while sorted_iterator_lengths and sorted_iterator_lengths[0][0] == smallest_iterator_length:
+            sorted_iterator_lengths.pop(0)
+
+    index_this_cycle = starting_index - sub_total
+    index_into_iterator, remaining_iterator_index = divmod(index_this_cycle, len(sorted_iterator_lengths))
+
+    remaining_iterators = sorted(sorted_iterator_lengths, key = lambda t: t[1])
+    guess_index = remaining_iterators[remaining_iterator_index][1]
+    # Could just use guesses, but in case something changes, that messes with the order
+    guess = list(guesses_sub_totals)[guess_index]
 
 
 def _make_guesses_alt_chars(
@@ -217,21 +242,38 @@ def _calculate_sub_totals(
     }
 
 
+def _candidates_from_first_index(
+    first_index: int,
+    sub_totals: dict[int, dict[str, int]],
+    guesses_alts: dict[str, dict[int, list[str]]],
+    total: int,
+):
+    num_skipped = 0
+    items_it = iter(sub_totals.items())
+    for num_subs, guesses_sub_totals in items_it:
+        sub_total = sum(guesses_sub_totals.values())
+        if first_index < num_skipped + sub_total:
+            break
+        num_skipped += sub_total
+    else:
+        raise ValueError(f"Index too large: {first_index=}, candidates skipped: {num_skipped} ({total=})")         
+
+    for i, d in chain([(num_subs, guesses_sub_totals)], items_it):
+        yield from _roundrobin_all_guesses(
+            guesses_alts=guesses_alts,
+            guesses_sub_totals=d,
+            first_index=first_index,
+            num_subs=i,
+        )
+
+
 def candidate_passwords_from_alt_chars(
     guesses: list[str],
-    starting_index: int = 0,
+    first_index: int = 0,
     min_subs: int = 0,
     max_subs: int = 2,
     alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
 ) -> tuple[int, Iterator[tuple[int, tuple[str, int]]]]:
-
-    if starting_index != 0:
-        raise ValueError(
-            "This candidate generator is not an indexable iterator. "
-            "It must always start from scratch; it does not support shortcuts. "
-            "--starting-index must be used with --resume "
-            # "or --password-generator=indexable"
-        )
 
     guesses_alts = _make_guesses_alt_chars(guesses, alt_char_map)
 
@@ -239,15 +281,18 @@ def candidate_passwords_from_alt_chars(
     total_num_candidates = sum(
         sum(guess_totals.values()) for guess_totals in sub_totals.values()
     )
-    candidates_it = _candidates_from_alts_dict(
-        guesses_alts,
-        min_subs=min_subs,
-        max_subs=max_subs,
+
+    candidates = candidates_from_first_index(
+        first_index=first_index,
+        sub_totals=sub_totals,
+        guesses_alts = guesses_alts,
+        total=total_num_candidates,
     )
-    return total_num_candidates, enumerate(candidates_it)
+
+    return total_num_candidates, candidates
 
 
-def possibly_output_found_password(
+def handle_found_password_output(
     password: str,
     i: int,
     t: float | None = None,
@@ -260,7 +305,8 @@ def possibly_output_found_password(
         msg = f"{msg} in {t:.3f} seconds"
     print_to_stderr(msg, end="")
 
-    print_to_stderr(f" {password=}" if print_passwords else "")
+    if print_passwords:
+        print_to_stderr(f" {password=}")
 
     if output_file:
         with open(output_file, "at") as f:
@@ -458,7 +504,7 @@ def _try_make_ssh_key_checker_from_loader(
         if e.args[0] != incorrect_password_msg:
             raise
     else:
-        possibly_output_found_password(
+        handle_found_password_output(
             hopefully_incorrect_password,
             i=-12345,
             t=None,
@@ -678,7 +724,7 @@ parser.add_argument(
     help=("Try to resume a previous interrupted search, from a saved index. "),
 )
 parser.add_argument(
-    "--starting-index",
+    "--first-index",
     type=int,
     default=0,
     help=("Try to resume a previous interrupted search, from a saved index. "),
@@ -937,7 +983,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         )
 
     total, candidates = ns.password_generator(
-        starting_index=ns.starting_index,
+        first_index=ns.first_index,
         guesses=password_guesses,
         min_subs=ns.min_subs,
         max_subs=ns.max_subs,
@@ -964,7 +1010,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
 
     password, i = result
 
-    possibly_output_found_password(password, i, t1 - t0, **kwargs)
+    handle_found_password_output(password, i, t1 - t0, **kwargs)
 
     return 0
 
