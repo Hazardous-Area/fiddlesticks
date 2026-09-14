@@ -36,7 +36,7 @@ import time
 import warnings
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from itertools import combinations, cycle, islice, product
+from itertools import chain, combinations, cycle, islice, product
 from pathlib import Path
 from typing import cast
 
@@ -190,71 +190,52 @@ def _roundrobin_all_guesses(
 
     num_skipped = 0
 
-    iterator_indices_by_length = defaultdict(list)
-    for i, n in enumerate(guesses_sub_totals.values()):
-        iterator_indices_by_length[n].append(i)
-    iterator_lengths = {}
-    for n in sorted(iterator_indices_by_length):
-        iterator_lengths[n] = iterator_indices_by_length[n]
-
-    L = len(guesses_sub_totals)
-
-    for iterator_length, indices in iterator_lengths.items():
-        num_items_this_block = smallest_iterator_length * L
-
-        if starting_index < num_skipped + num_items_this_block:
-
-            # handle starting state for round robin wrapping into next block
-            if starting_index > num_items_this_block - L:
-                pass
-            break
-
-
-
-
-
     iterator_lengths = sorted((n, i) for i, n in enumerate(guesses_sub_totals.values()))
-    this_block_start = 0
-    next_block_start = next(j for n, j in iterator_lengths if n > iterator_lengths[0][0], None) 
     # Add items yielded by Round Robin, allowing for removal of exhausted iterators
-    while sorted_iterator_lengths:
-        smallest_iterator_length = sorted_iterator_lengths[0][0]
-        L = len(sorted_iterator_lengths)
+    while iterator_lengths:
+        smallest_iterator_length = iterator_lengths[0][0]
+        L = len(iterator_lengths)
         num_items_this_block = smallest_iterator_length * L
 
         if starting_index < num_skipped + num_items_this_block:
-
-            # handle starting state for round robin wrapping into next block
-            if starting_index > num_items_this_block - L:
-                pass
             break
 
-        while sorted_iterator_lengths and sorted_iterator_lengths[0][0] == smallest_iterator_length:
-            sorted_iterator_lengths.pop(0)
+        while iterator_lengths and iterator_lengths[0][0] == smallest_iterator_length:
+            iterator_lengths.pop(0)
 
         num_skipped += num_items_this_block
 
 
     starting_index_this_block = starting_index - num_skipped
-    iterator_indices = sorted(i for n, i in sorted_iterator_lengths)
+    iterator_indices = sorted(i for n, i in iterator_lengths)
     iterators = []
-    L = len(sorted_iterator_lengths)
+    L = len(iterator_lengths)
+
+    index_into_iterator, index_of_iterator = divmod(j + starting_index_this_block, L)
+
 
     # j is only a loop variable to label the
     # up to L new iterators in the first RoundRobin state
-    for j in range(L):
+    for j in chain(range(index_of_iterator, L), range(index_of_iterator)):
         # What if + j  goes over into a new block, and expires an iterator?
-        index_into_iterator, index_of_iterator = divmod(j + starting_index_this_block, L)
 
         # Just:
         # i) iterate over iterators in the cycle,
         # ii) skip those that have been exhausted,
         # iii) only bump index_into_iterator for unexhausted iterators
 
-        guess_index = iterator_indices[index_of_iterator]
+        guess_index = iterator_indices[j]
         guess = list(guesses_sub_totals)[guess_index]
+        guess_it_length = guesses_sub_totals[guess]
 
-        iterators.append(_candidates_from_num_subs(guess, num_subs, guesses_alts[guess]))
+        # Skip if in next block, and exhausted there
+        if (starting_index > num_skipped + num_items_this_block - L and
+            j < index_of_iterator and
+            guess_it_length > smallest_iterator_length and
+            ):
+        iterators.append(_candidates_from_num_subs(guess, num_subs, guesses_alts[guess], first_index=index_into_iterator))
+        index_into_iterator += 1
+    
 
     return roundrobin(iterators)
 
@@ -321,6 +302,9 @@ def candidate_passwords_from_alt_chars(
     max_subs: int = 2,
     alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
 ) -> tuple[int, Iterator[tuple[int, tuple[str, int]]]]:
+
+    if not guesses:
+        return 0, iter([])
 
     guesses_alts = _make_guesses_alt_chars(guesses, alt_char_map)
 
