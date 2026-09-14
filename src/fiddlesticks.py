@@ -158,16 +158,16 @@ def _candidates_from_num_subs(
             )
 
 
-# # https://docs.python.org/3/license.html#zero-clause-bsd-license-for-code-in-the-python-documentation
-# # https://docs.python.org/3/library/itertools.html#itertools-recipes
-# def roundrobin(*iterables):
-#     "Visit input iterables in a cycle until each is exhausted."
-#     # roundrobin('ABC', 'D', 'EF') → A D E B F C
-#     # Algorithm credited to George Sakkis
-#     iterators = map(iter, iterables)
-#     for num_active in range(len(iterables), 0, -1):
-#         iterators = cycle(islice(iterators, num_active))
-#         yield from map(next, iterators)
+# https://docs.python.org/3/license.html#zero-clause-bsd-license-for-code-in-the-python-documentation
+# https://docs.python.org/3/library/itertools.html#itertools-recipes
+def roundrobin(*iterables):
+    "Visit input iterables in a cycle until each is exhausted."
+    # roundrobin('ABC', 'D', 'EF') → A D E B F C
+    # Algorithm credited to George Sakkis
+    iterators = map(iter, iterables)
+    for num_active in range(len(iterables), 0, -1):
+        iterators = cycle(islice(iterators, num_active))
+        yield from map(next, iterators)
 
 
 # def _candidates_from_alts_dict(
@@ -182,30 +182,81 @@ def _candidates_from_num_subs(
 #     yield from roundrobin(iterators)
 
 def _roundrobin_all_guesses(
+    num_subs: int,
     guesses_alts: dict[str, dict[int, list[str]]],
     guesses_sub_totals: dict[str, int],
     first_index: int = 0,
-    num_subs: int,
 ) -> Iterator[tuple[str, int]]:
-    
-    sorted_iterator_lengths = sorted((n, i) for i, n in enumerate(guesses_sub_totals.values()))
 
+    num_skipped = 0
+
+    iterator_indices_by_length = defaultdict(list)
+    for i, n in enumerate(guesses_sub_totals.values()):
+        iterator_indices_by_length[n].append(i)
+    iterator_lengths = {}
+    for n in sorted(iterator_indices_by_length):
+        iterator_lengths[n] = iterator_indices_by_length[n]
+
+    L = len(guesses_sub_totals)
+
+    for iterator_length, indices in iterator_lengths.items():
+        num_items_this_block = smallest_iterator_length * L
+
+        if starting_index < num_skipped + num_items_this_block:
+
+            # handle starting state for round robin wrapping into next block
+            if starting_index > num_items_this_block - L:
+                pass
+            break
+
+
+
+
+
+    iterator_lengths = sorted((n, i) for i, n in enumerate(guesses_sub_totals.values()))
+    this_block_start = 0
+    next_block_start = next(j for n, j in iterator_lengths if n > iterator_lengths[0][0], None) 
     # Add items yielded by Round Robin, allowing for removal of exhausted iterators
     while sorted_iterator_lengths:
         smallest_iterator_length = sorted_iterator_lengths[0][0]
-        num_items_until_smallest_iterators_exhausted = smallest_iterator_length * len(sorted_iterator_lengths)
-        if starting_index < sub_total + num_items_until_smallest_iterators_exhausted:
+        L = len(sorted_iterator_lengths)
+        num_items_this_block = smallest_iterator_length * L
+
+        if starting_index < num_skipped + num_items_this_block:
+
+            # handle starting state for round robin wrapping into next block
+            if starting_index > num_items_this_block - L:
+                pass
             break
+
         while sorted_iterator_lengths and sorted_iterator_lengths[0][0] == smallest_iterator_length:
             sorted_iterator_lengths.pop(0)
 
-    index_this_cycle = starting_index - sub_total
-    index_into_iterator, remaining_iterator_index = divmod(index_this_cycle, len(sorted_iterator_lengths))
+        num_skipped += num_items_this_block
 
-    remaining_iterators = sorted(sorted_iterator_lengths, key = lambda t: t[1])
-    guess_index = remaining_iterators[remaining_iterator_index][1]
-    # Could just use guesses, but in case something changes, that messes with the order
-    guess = list(guesses_sub_totals)[guess_index]
+
+    starting_index_this_block = starting_index - num_skipped
+    iterator_indices = sorted(i for n, i in sorted_iterator_lengths)
+    iterators = []
+    L = len(sorted_iterator_lengths)
+
+    # j is only a loop variable to label the
+    # up to L new iterators in the first RoundRobin state
+    for j in range(L):
+        # What if + j  goes over into a new block, and expires an iterator?
+        index_into_iterator, index_of_iterator = divmod(j + starting_index_this_block, L)
+
+        # Just:
+        # i) iterate over iterators in the cycle,
+        # ii) skip those that have been exhausted,
+        # iii) only bump index_into_iterator for unexhausted iterators
+
+        guess_index = iterator_indices[index_of_iterator]
+        guess = list(guesses_sub_totals)[guess_index]
+
+        iterators.append(_candidates_from_num_subs(guess, num_subs, guesses_alts[guess]))
+
+    return roundrobin(iterators)
 
 
 def _make_guesses_alt_chars(
@@ -252,18 +303,14 @@ def _candidates_from_first_index(
     items_it = iter(sub_totals.items())
     for num_subs, guesses_sub_totals in items_it:
         sub_total = sum(guesses_sub_totals.values())
-        if first_index < num_skipped + sub_total:
-            break
-        num_skipped += sub_total
-    else:
-        raise ValueError(f"Index too large: {first_index=}, candidates skipped: {num_skipped} ({total=})")         
+        if first_index >= num_skipped + sub_total:
+            num_skipped += sub_total
+            continue
 
-    for i, d in chain([(num_subs, guesses_sub_totals)], items_it):
         yield from _roundrobin_all_guesses(
             guesses_alts=guesses_alts,
             guesses_sub_totals=d,
-            first_index=first_index,
-            num_subs=i,
+            first_index=first_index-num_skipped,
         )
 
 
