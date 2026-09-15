@@ -36,7 +36,7 @@ import time
 import warnings
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from itertools import chain, combinations, cycle, islice, product
+from itertools import combinations, cycle, islice, product
 from pathlib import Path
 from typing import cast
 
@@ -146,6 +146,7 @@ def _candidates_from_num_subs(
     guess: str,
     num_subs: int,
     char_indexed_alts: dict[int, list[str]],
+    first_index: int = 0,
 ) -> Iterator[tuple[str, int]]:
     if num_subs == 0:
         yield guess, 0
@@ -197,7 +198,7 @@ def _roundrobin_all_guesses(
         L = len(iterator_lengths)
         num_items_this_block = smallest_iterator_length * L
 
-        if starting_index < num_skipped + num_items_this_block:
+        if first_index < num_skipped + num_items_this_block:
             break
 
         while iterator_lengths and iterator_lengths[0][0] == smallest_iterator_length:
@@ -206,36 +207,60 @@ def _roundrobin_all_guesses(
         num_skipped += num_items_this_block
 
 
-    starting_index_this_block = starting_index - num_skipped
-    iterator_indices = sorted(i for n, i in iterator_lengths)
+    first_index_this_block = first_index - num_skipped
+    iterator_indices_this_block = sorted(i for n, i in iterator_lengths)
     iterators = []
     L = len(iterator_lengths)
 
-    index_into_iterator, index_of_iterator = divmod(j + starting_index_this_block, L)
+    index_into_iterator, index_of_iterator = divmod(first_index_this_block, L)
+
 
 
     # j is only a loop variable to label the
     # up to L new iterators in the first RoundRobin state
-    for j in chain(range(index_of_iterator, L), range(index_of_iterator)):
+    for j in range(index_of_iterator, L):
+
+        guess_index = iterator_indices_this_block[j]
+        guess = list(guesses_sub_totals)[guess_index]
+        guess_it_length = guesses_sub_totals[guess]
+
+        iterators.append(_candidates_from_num_subs(
+            guess,
+            num_subs,
+            guesses_alts[guess],
+            first_index=index_into_iterator,
+        ))
+    
+    for j in range(index_of_iterator):
         # What if + j  goes over into a new block, and expires an iterator?
 
         # Just:
         # i) iterate over iterators in the cycle,
         # ii) skip those that have been exhausted,
         # iii) only bump index_into_iterator for unexhausted iterators
-
-        guess_index = iterator_indices[j]
+        
+        guess_index = iterator_indices_this_block[j]
         guess = list(guesses_sub_totals)[guess_index]
         guess_it_length = guesses_sub_totals[guess]
 
-        # Skip if in next block, and exhausted there
-        if (starting_index > num_skipped + num_items_this_block - L and
-            j < index_of_iterator and
-            guess_it_length > smallest_iterator_length and
+        # Skip if the offset wraps into next block, but the iterator 
+        # was already exhausted in this block.
+        #
+        # num_skipped + num_items_this_block is the first index in the next block
+        # and the last iterator's offset from the first (0) could be + L-1
+        if (first_index > num_skipped + num_items_this_block - L and
+            guess_it_length == smallest_iterator_length # was exhausted this block
             ):
-        iterators.append(_candidates_from_num_subs(guess, num_subs, guesses_alts[guess], first_index=index_into_iterator))
-        index_into_iterator += 1
-    
+            continue
+
+        iterators.append(
+            _candidates_from_num_subs(
+                guess,
+                num_subs,
+                guesses_alts[guess],
+                first_index=index_into_iterator+1,
+        ))
+
 
     return roundrobin(iterators)
 
