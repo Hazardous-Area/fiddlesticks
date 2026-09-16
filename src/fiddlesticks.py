@@ -25,8 +25,8 @@ import argparse
 import atexit
 import getpass
 import io
-import itertools
 import json
+import math
 import os
 import string
 import subprocess
@@ -36,7 +36,8 @@ import textwrap
 import time
 import warnings
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from itertools import combinations, cycle, islice, product
 from pathlib import Path
 from typing import cast
 
@@ -95,7 +96,7 @@ def print_to_stderr(*objects, **kwargs):
     print(*objects, file=sys.stderr, **kwargs)
 
 
-def _calculate_total(lengths, M):
+def _calculate_total_from_alts_lengths(lengths, M):
     # dp[j] = sum of products for choosing j items
     dp = [0] * (M + 1)
     dp[0] = 1
@@ -123,87 +124,266 @@ def _combine_maps(
 SHIFT_AND_LEET_BI_MAP = _combine_maps([SHIFT_MAP, LEET_SPEAK])
 
 
+def _all_positions_and_alts(
+    num_subs: int,
+    char_indexed_alts: dict[int, list[str]],
+) -> Iterator[dict[int, list[str]]]:
+    for positions in combinations(char_indexed_alts, num_subs):
+        yield {i: char_indexed_alts[i] for i in positions}
+
+
+def _candidate_from_selected_alts(
+    guess: str,
+    selected: Sequence[str],
+    positions_and_alts: dict[int, list[str]],
+) -> str:
+    candidate = list(guess)
+    for i, replacement in zip(positions_and_alts, selected):
+        candidate[i] = replacement
+    return "".join(candidate)
+
+
 def _candidates_from_num_subs(
     guess: str,
     num_subs: int,
-    alts: list[list[str]],
+    char_indexed_alts: dict[int, list[str]],
+    first_index: int = 0,
 ) -> Iterator[tuple[str, int]]:
     if num_subs == 0:
         yield guess, 0
         return
-    for positions in itertools.combinations(range(len(guess)), num_subs):
-        alts_at_positions = [alts[i] for i in positions if alts[i]]
-
-        if len(alts_at_positions) != num_subs:
+    num_skipped_or_yielded = 0
+    for positions_and_alts in _all_positions_and_alts(num_subs, char_indexed_alts):
+        n = math.prod(len(alts) for alts in positions_and_alts.values())
+        if first_index >= num_skipped_or_yielded + n:
+            num_skipped_or_yielded += n
             continue
 
-        for selected in itertools.product(*alts_at_positions):
-            candidate_password = list(guess)
-            for i, replacement in zip(positions, selected):
-                candidate_password[i] = replacement
-            yield "".join(candidate_password), num_subs
+        start = max(0, first_index - num_skipped_or_yielded)
+        num_skipped_or_yielded += start
+
+        # base iterator (product(*...) ) yields n
+        # islice yields n - (first_index - num_skipped_or_yielded)
+        # after the first iteration start is non-zero,
+        # num_skipped_or_yielded == first_index
+        # +=s to  => first_index + n - (firstindex - num_skipped_or_yielded) == n + num_skipped_or_yielded
+        # so therefore first_index - num_skipped_or_yilded == first_index - prev - n
+        # And from the prior continue check we know first_index < prev + n
+        # Thereafter, first_index - prev - n < 0, and so start is only ever non-zero once.
+
+        for selected in islice(
+            product(*positions_and_alts.values()),
+            start,
+            None,  # stop
+        ):
+            yield (
+                _candidate_from_selected_alts(guess, selected, positions_and_alts),
+                num_subs,
+            )
+
+            num_skipped_or_yielded += 1
 
 
-def _candidates_from_alts_dict(
-    guesses_alts: dict[str, list[list[str]]],
-    max_subs: int,
-    min_subs: int = 0,
+# https://docs.python.org/3/license.html#zero-clause-bsd-license-for-code-in-the-python-documentation
+# https://docs.python.org/3/library/itertools.html#itertools-recipes
+def roundrobin(*iterables):
+    "Visit input iterables in a cycle until each is exhausted."
+    # roundrobin('ABC', 'D', 'EF') → A D E B F C
+    # Algorithm credited to George Sakkis
+    iterators = map(iter, iterables)
+    for num_active in range(len(iterables), 0, -1):
+        iterators = cycle(islice(iterators, num_active))
+        yield from map(next, iterators)
+
+
+# def _candidates_from_alts_dict(
+#     guesses_alts: dict[str, dict[int, list[str]]],
+#     first_index: int = 0,
+#     num_subs: int,
+# ) -> Iterator[tuple[str, int]]:
+#     iterators = (
+#         _candidates_from_num_subs(guess, num_subs, alts)
+#         for guess, alts in guesses_alts.items()
+#     )
+#     yield from roundrobin(iterators)
+
+
+def _roundrobin_all_guesses(
+    num_subs: int,
+    guesses_alts: dict[str, dict[int, list[str]]],
+    guesses_sub_totals: dict[str, int],
+    first_index: int = 0,
 ) -> Iterator[tuple[str, int]]:
+
+    num_skipped = num_skipped_per_unexhausted_iterator = 0
+
+    iterator_lengths = sorted((n, i) for i, n in enumerate(guesses_sub_totals.values()))
+    # Add items yielded by Round Robin, allowing for removal of exhausted iterators
+    while iterator_lengths:
+        smallest_iterator_length = iterator_lengths[0][0]
+        L = len(iterator_lengths)
+        num_items_this_block = smallest_iterator_length * L
+
+        if first_index < num_skipped + num_items_this_block:
+            break
+
+        while iterator_lengths and iterator_lengths[0][0] == smallest_iterator_length:
+            iterator_lengths.pop(0)
+
+        num_skipped += num_items_this_block
+        num_skipped_per_unexhausted_iterator += smallest_iterator_length
+
+    first_index_this_block = first_index - num_skipped
+    iterator_indices_this_block = sorted(i for n, i in iterator_lengths)
+    iterators = []
+    L = len(iterator_lengths)
+
+    if L == 0:
+        return iter([])
+
+    index_into_iterator, index_of_iterator = divmod(first_index_this_block, L)
+    index_into_iterator += num_skipped_per_unexhausted_iterator
+
+    # j is only a loop variable to label the
+    # up to L new iterators in the first RoundRobin state
+    for j in range(index_of_iterator, L):
+        guess_index = iterator_indices_this_block[j]
+        guess = list(guesses_sub_totals)[guess_index]
+        guess_it_length = guesses_sub_totals[guess]
+
+        iterators.append(
+            _candidates_from_num_subs(
+                guess,
+                num_subs,
+                guesses_alts[guess],
+                first_index=index_into_iterator,
+            )
+        )
+
+    for j in range(index_of_iterator):
+        # What if + j  goes over into a new block, and expires an iterator?
+
+        # Just:
+        # i) iterate over iterators in the cycle,
+        # ii) skip those that have been exhausted,
+
+        guess_index = iterator_indices_this_block[j]
+        guess = list(guesses_sub_totals)[guess_index]
+        guess_it_length = guesses_sub_totals[guess]
+
+        # Skip if the offset wraps into next block, but the iterator
+        # was already exhausted in this block.
+        #
+        # num_skipped + num_items_this_block is the first index in the next block
+        # and the last iterator's offset from the first (0) could be + L-1
+        if (
+            first_index > num_skipped + num_items_this_block - L
+            and guess_it_length == smallest_iterator_length  # was exhausted this block
+        ):
+            continue
+
+        iterators.append(
+            _candidates_from_num_subs(
+                guess,
+                num_subs,
+                guesses_alts[guess],
+                # These earlier iterators are in their next round robin cycle, so +1
+                first_index=index_into_iterator + 1,
+            )
+        )
+
+    return roundrobin(*iterators)
+
+
+def _make_guesses_alt_chars(
+    guesses: list[str],
+    alt_char_map: dict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
+) -> dict[str, dict[int, list[str]]]:
+    return {
+        guess: {
+            #  list() in case alt_char_map[c] is a str
+            i: list(alt_char_map[c])
+            for i, c in enumerate(guess)
+            if c in alt_char_map
+        }
+        for guess in guesses
+    }
+
+
+def _calculate_sub_totals(
+    guesses_alts: dict[str, dict[int, list[str]]],
+    min_subs: int = 0,
+    max_subs: int = 2,
+) -> dict[int, dict[str, int]]:
+
+    lengths = {
+        guess: [len(chars) for chars in alts.values()]
+        for guess, alts in guesses_alts.items()
+    }
+    d = {}
     for num_subs in range(min_subs, max_subs + 1):
-        # Yield candidates derived from each guess using
-        # a not quite Round robin order (that restarts
-        # from the earliest iterator after one is exhausted).
-        iterators = [
-            _candidates_from_num_subs(guess, num_subs, alts)
-            for guess, alts in guesses_alts.items()
-        ]
-        while iterators:
-            # Coverage would like to see tests covering iterators being empty,
-            # which is not reachable within a while iterators: loop.
-            for i, iterator in itertools.cycle(
-                enumerate(iterators)
-            ):  # pragma: no branch
-                # More itertools' roundrobin just breaks out of the loop
-                # using a next call with no fallback value, to raise StopIteration
-                candidate = next(iterator, None)
-                if candidate is None:
-                    break
-                yield candidate
-            # Get rid of exhausted iterator
-            iterators.pop(i)
+        sub_d = {
+            guess: _calculate_total_from_alts_lengths(alts_lengths, num_subs)
+            for guess, alts_lengths in lengths.items()
+        }
+        if sum(sub_d.values()) >= 1:
+            d[num_subs] = sub_d
+        else:
+            print("Yep")
+
+    return d
+
+
+def _candidates_from_first_index(
+    first_index: int,
+    sub_totals: dict[int, dict[str, int]],
+    guesses_alts: dict[str, dict[int, list[str]]],
+    total: int,
+) -> Iterator[tuple[str, int]]:
+    num_skipped = 0
+    for num_subs, d in sub_totals.items():
+        sub_total = sum(d.values())
+        if first_index >= num_skipped + sub_total:
+            num_skipped += sub_total
+            continue
+
+        yield from _roundrobin_all_guesses(
+            num_subs=num_subs,
+            guesses_alts=guesses_alts,
+            guesses_sub_totals=d,
+            first_index=first_index - num_skipped,
+        )
 
 
 def candidate_passwords_from_alt_chars(
     guesses: list[str],
+    first_index: int = 0,
     min_subs: int = 0,
     max_subs: int = 2,
-    alt_chars: list[list[list[str]]] | None = None,
     alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
 ) -> tuple[int, Iterator[tuple[str, int]]]:
 
-    overrides = [None for guess in guesses] if alt_chars is None else alt_chars
-    guesses_alts: dict[str, list[list[str]]]
-    guesses_alts = {
-        # In case alt_char_map[c] is a str
-        guess: [list(alt_char_map[c]) for c in guess] if alts is None else alts
-        for guess, alts in zip(guesses, overrides)
-    }
+    if not guesses:
+        return 0, iter([])
 
-    total_num_candidates = 0
-    for alts in guesses_alts.values():
-        lengths = [len(chars) for chars in alts]
-        total_num_candidates += sum(
-            _calculate_total(lengths, M) for M in range(min_subs, max_subs + 1)
-        )
-    candidates_it = _candidates_from_alts_dict(
-        guesses_alts,
-        min_subs=min_subs,
-        max_subs=max_subs,
+    guesses_alts = _make_guesses_alt_chars(guesses, alt_char_map)
+
+    sub_totals = _calculate_sub_totals(guesses_alts, min_subs, max_subs)
+    total_num_candidates = sum(
+        sum(guess_totals.values()) for guess_totals in sub_totals.values()
     )
-    return total_num_candidates, candidates_it
+
+    candidates = _candidates_from_first_index(
+        first_index=first_index,
+        sub_totals=sub_totals,
+        guesses_alts=guesses_alts,
+        total=total_num_candidates,
+    )
+
+    return total_num_candidates, candidates
 
 
-def possibly_output_found_password(
+def handle_found_password_output(
     password: str,
     i: int,
     t: float | None = None,
@@ -216,7 +396,8 @@ def possibly_output_found_password(
         msg = f"{msg} in {t:.3f} seconds"
     print_to_stderr(msg, end="")
 
-    print_to_stderr(f" {password=}" if print_passwords else "")
+    if print_passwords:
+        print_to_stderr(f" {password=}")
 
     if output_file:
         with open(output_file, "at") as f:
@@ -414,7 +595,7 @@ def _try_make_ssh_key_checker_from_loader(
         if e.args[0] != incorrect_password_msg:
             raise
     else:
-        possibly_output_found_password(
+        handle_found_password_output(
             hopefully_incorrect_password,
             i=-12345,
             t=None,
@@ -555,6 +736,7 @@ def check_passwords_sequentially(
     update_every: int | None = None,
     total: int | None = None,
     print_passwords: bool = False,
+    first_index: int = 0,
     **kwargs,
 ) -> tuple[str, int] | None:
 
@@ -567,7 +749,7 @@ def check_passwords_sequentially(
         update_every = min(update_every, 1000)
 
     last_printed_num_subs = 0
-    for i, (candidate, num_subs) in enumerate(candidates, start=1):
+    for i, (candidate, num_subs) in enumerate(candidates, start=first_index):
         if test_func(candidate):
             return candidate, i
 
@@ -627,6 +809,18 @@ def _default_factory_selector(*args: str):
 
 parser = argparse.ArgumentParser(prog="fiddlesticks")
 parser.suggest_on_error = True  # type: ignore
+parser.add_argument(
+    "--resume",
+    type=bool,
+    default=False,
+    help=("Try to resume a previous interrupted search, from a saved index. "),
+)
+parser.add_argument(
+    "--first-index",
+    type=int,
+    default=0,
+    help=("Try to resume a previous interrupted search, from a saved index. "),
+)
 parser.add_argument(
     "--max-subs",
     "-N",
@@ -854,6 +1048,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
             password_guesses.append(password_guess)
 
     extras = kwargs.pop("extras")
+    _resume = kwargs.pop("resume")
 
     if ns.command is None:
         command = _default_factory_selector(*extras)
@@ -880,6 +1075,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         )
 
     total, candidates = ns.password_generator(
+        first_index=ns.first_index,
         guesses=password_guesses,
         min_subs=ns.min_subs,
         max_subs=ns.max_subs,
@@ -906,7 +1102,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
 
     password, i = result
 
-    possibly_output_found_password(password, i, t1 - t0, **kwargs)
+    handle_found_password_output(password, i, t1 - t0, **kwargs)
 
     return 0
 

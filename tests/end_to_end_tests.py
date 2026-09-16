@@ -53,6 +53,7 @@ def test_print_alt_char_map_is_valid_JSON():
     assert json.loads(result.stderr.decode()) == BI_MAP
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="3000 pw args exceeds Windows' Path limit")
 @pytest.mark.parametrize(
     "guesses,num_subs,mapping,expected,verbosity",
     [
@@ -118,6 +119,28 @@ def test_piping_candidates_from_alt_char_map(
         assert len(result.stderr) > 0
 
 
+def _collate_args(
+    num_subs: int,
+    guesses: list[str],
+    *args: str,
+    shell: bool = False,
+) -> list[str]:
+    # Collates args for subprocess.run, the entire command
+    # used to test fiddlesticks.  I.e. not necessarily just
+    # the args for fiddlesticks, e.g. Bash external to it
+    # could be included too.
+    pwd_args = [f"--password-guess={guess}" for guess in guesses]
+    if shell:
+        pwd_args = [shlex.quote(pwd_arg) for pwd_arg in pwd_args]
+    return [
+        "fiddlesticks",
+        "--max-subs",
+        f"{num_subs}",
+        *pwd_args,
+        *args,
+    ]
+
+
 def _run_fiddlesticks_without_extract_to(
     max_num_subs: int,
     guesses: list[str],
@@ -140,6 +163,9 @@ def _run_fiddlesticks_without_extract_to(
     )
 
 
+@pytest.mark.skipif(
+    IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet"
+)
 @pytest.mark.parametrize(
     "file",
     [
@@ -153,6 +179,9 @@ def test_default_command_from_file_ext(file, tmp_path):
     assert result.returncode == 0
 
 
+@pytest.mark.skipif(
+    IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet"
+)
 @pytest.mark.parametrize(
     "command",
     [
@@ -203,6 +232,9 @@ def test_default_command_with_docx_bad_guess_and_verbose():
     assert result.returncode == 1
 
 
+@pytest.mark.skipif(
+    IS_WINDOWS, reason="I haven't figured out the Veracrypt CLI on Windows yet"
+)
 def test_default_command_with_Veracrypt_volume(tmp_path):
     volume = tmp_path / "test.hc"
     password = "test"
@@ -269,12 +301,16 @@ def test_update_every_verbosity_2_and_print_password(tmp_path):
     assert result.returncode == 0
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="Echo works differently in cmd")
 def test_default_with_a_shell_command(tmp_path):
     guesses = ["A"]
     result = _run_fiddlesticks_without_extract_to(0, guesses, None, tmp_path, "echo ")
     assert result.returncode == 0
 
 
+@pytest.mark.skipif(
+    IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet"
+)
 def test_default_with_a_shell_script_file(tmp_path):
     # Try to trigger the shell=False flavour of subprocess checker
     script = tmp_path / "extract_with_7z.sh"
@@ -306,28 +342,6 @@ def test_default_without_a_file_or_shell_command(tmp_path):
     assert result.returncode != 0  # Should raise the ValueError for missing *args
 
 
-def _collate_args(
-    num_subs: int,
-    guesses: list[str],
-    *args: str,
-    shell: bool = False,
-) -> list[str]:
-    # Collates args for subprocess.run, the entire command
-    # used to test fiddlesticks.  I.e. not necessarily just
-    # the args for fiddlesticks, e.g. Bash external to it
-    # could be included too.
-    pwd_args = [f"--password-guess={guess}" for guess in guesses]
-    if shell:
-        pwd_args = [shlex.quote(pwd_arg) for pwd_arg in pwd_args]
-    return [
-        "fiddlesticks",
-        "--max-subs",
-        f"{num_subs}",
-        *pwd_args,
-        *args,
-    ]
-
-
 def make_internal_checker_args_collater(
     checker: str,
 ) -> Callable[[int, Path, str, str], list[str]]:
@@ -357,6 +371,7 @@ def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, file: st
     )
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="Might be run in cmd on Windows, not Bash")
 def pipe_to_bash_while_loop_collater(
     num_subs: int, test_extracted_dir: Path, guess: str, file: str
 ):
@@ -382,9 +397,7 @@ def pipe_to_bash_while_loop_collater(
 
 @pytest.mark.hypothesis
 @pytest.mark.slow
-@pytest.mark.skipif(
-    IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet"
-)
+@pytest.mark.skipif(IS_WINDOWS, reason="Might be run in cmd on Windows, not Bash")
 @settings(
     max_examples=3,
     phases=[Phase.explicit, Phase.reuse, Phase.generate],  # Skip shrinking

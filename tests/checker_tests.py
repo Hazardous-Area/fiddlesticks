@@ -61,6 +61,9 @@ def test_make_new_tmp_sub_dir(tmp_path, capsys):
     capsys.readouterr()
 
 
+@pytest.mark.skipif(
+    IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet"
+)
 def test_make_subprocess_checker(tmp_path):
     script = tmp_path / "extract_with_7z.sh"
     script.write_text(f"""\
@@ -87,6 +90,9 @@ def test_sequential_passwords_checker_verbosity_2(capsys):
     assert result is None
 
 
+@pytest.mark.skipif(
+    IS_WINDOWS, reason="I haven't figured out the OpenSSH CLI on Windows yet"
+)
 def test_ssh_key_checker(tmp_path):
     ssh_test_keys = _try_make_ssh_key_files(tmp_path)
     for key_file, pw in ssh_test_keys:
@@ -96,6 +102,9 @@ def test_ssh_key_checker(tmp_path):
         assert checker(pw)
 
 
+@pytest.mark.skipif(
+    IS_WINDOWS, reason="I haven't figured out the OpenSSH CLI on Windows yet"
+)
 @pytest.mark.parametrize(
     "print_passwords",
     [True, False],
@@ -116,6 +125,9 @@ def test_ssh_key_checker_no_username_finds_password_on_init(
             )
 
 
+@pytest.mark.skipif(
+    IS_WINDOWS, reason="I haven't figured out the OpenSSH CLI on Windows yet"
+)
 def test_ssh_key_checker_bad_file(tmp_path):
     file = tmp_path / "test_bad_key"
     file.write_bytes(b"oh2343gsbnwRPJWG32546OMPJDFAFSDGH&53423NZjiga")
@@ -130,6 +142,9 @@ def test_ms_office_crypto_tool_checker(path: Path):
     assert checker("test")
 
 
+@pytest.mark.skipif(
+    IS_WINDOWS, reason="I haven't figured out the Veracrypt CLI on Windows yet"
+)
 def test_veracrypt_checker(tmp_path):
     volume = tmp_path / "test.hc"
     password = "test"
