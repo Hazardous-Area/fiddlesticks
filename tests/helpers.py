@@ -48,11 +48,12 @@ chars_without_Bash_syntax = base_password_chars - BASH_CONTROL_CHARS
 
 def passwords(
     password_chars: set[str] = base_password_chars,
+    max_len: int = 40,
 ):
     return text(
         alphabet="".join(password_chars),
         min_size=1,
-        max_size=40,
+        max_size=max_len,
     )
 
 
@@ -145,6 +146,16 @@ def passwords_guesses_and_num_subs(
     return password, guess, num_subs
 
 
+def calc_num_candidates(
+    guesses: list[str],
+    min_subs: int,
+    max_subs: int,
+    mapping: dict[str,list[str]] = BI_MAP,
+) -> int:
+    guesses_alts = fiddlesticks._make_guesses_alt_chars(guesses, mapping)
+    sub_totals = fiddlesticks._calculate_sub_totals(guesses_alts, min_subs=min_subs, max_subs=max_subs)
+    return sum(sum(d.values()) for d in sub_totals.values())
+
 @composite
 def passwords_guesses_first_index_and_num_subs(
     draw,
@@ -154,11 +165,29 @@ def passwords_guesses_first_index_and_num_subs(
     pwd, guess, num_subs = draw(
         passwords_guesses_and_num_subs(max_subs, password_chars)
     )
-    guesses_alts = fiddlesticks._make_guesses_alt_chars([guess], BI_MAP)
-    sub_totals = fiddlesticks._calculate_sub_totals(guesses_alts, max_subs=num_subs)
-    num_guesses = sub_totals[num_subs][guess]
+    num_guesses = calc_num_candidates([guess], min_subs=num_subs, max_subs=num_subs)
     first_index = draw(integers(min_value=0, max_value=num_guesses - 1))
     return pwd, guess, first_index, num_subs
+
+
+@composite
+def guesses_max_subs_and_first_index(
+    draw,
+    max_num_pws: int = 8,
+    max_max_subs: int = 5,
+    max_pw_len: int = 40,
+) -> tuple[list[str], int, int]:
+    guesses = draw(lists(passwords(max_len=max_pw_len), min_size=0, max_size=max_num_pws))
+    if guesses:
+        max_max_subs = min(max_max_subs, *(len(guess) for guess in guesses))
+    else:
+        max_max_subs = 0
+    max_subs = draw(integers(min_value=0, max_value=max_max_subs))
+    num_candidates = calc_num_candidates(guesses, min_subs=0, max_subs=max_subs)
+    min_value=0
+    first_index = draw(integers(min_value=min_value, max_value=max(min_value,num_candidates - 1)))
+    return guesses, max_subs, first_index
+
 
 
 def _candidate_is_within_M_of_pwd(

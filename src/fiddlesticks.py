@@ -328,8 +328,6 @@ def _calculate_sub_totals(
         }
         if sum(sub_d.values()) >= 1:
             d[num_subs] = sub_d
-        else:
-            print("Yep")
 
     return d
 
@@ -371,7 +369,7 @@ def candidate_passwords_from_alt_chars(
     sub_totals = _calculate_sub_totals(guesses_alts, min_subs, max_subs)
     total_num_candidates = sum(
         sum(guess_totals.values()) for guess_totals in sub_totals.values()
-    )
+    ) - first_index
 
     candidates = _candidates_from_first_index(
         first_index=first_index,

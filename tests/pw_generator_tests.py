@@ -1,3 +1,5 @@
+import itertools
+
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis.strategies import integers
@@ -8,6 +10,7 @@ from .helpers import (
     BI_MAP,
     _assert_candidate_within_M_of_pwds,
     _candidate_is_within_M_of_pwd,
+    guesses_max_subs_and_first_index,
     passwords_guesses_and_num_subs,
     passwords_guesses_first_index_and_num_subs,
 )
@@ -69,12 +72,46 @@ def test_no_guesses():
 
 @pytest.mark.hypothesis
 @pytest.mark.slow
+@given(args=guesses_max_subs_and_first_index(max_max_subs=3, max_num_pws=4))
+@settings(
+    max_examples=3,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
+)
+def test_skipping_in_candidate_passwords_from_alt_chars(
+    args: tuple[list[str], int, int],
+):
+
+    guesses, max_subs, first_index = args
+
+    actual_total, actual_guesses_it = fiddlesticks.candidate_passwords_from_alt_chars(
+        guesses=guesses,
+        max_subs=max_subs,
+        first_index=first_index,
+    )
+    expected_total, expected_guesses_it = fiddlesticks.candidate_passwords_from_alt_chars(
+        guesses=guesses,
+        max_subs=max_subs,
+        first_index=0,
+    )
+    for _ in range(first_index):
+        next(expected_guesses_it)
+    i = None
+    for i, (actual, expected) in enumerate(itertools.zip_longest(actual_guesses_it, expected_guesses_it)):
+        assert actual == expected
+
+
+    assert (actual_total ==0 and i is None) or (i + 1 == actual_total)
+    assert (expected_total == 0 and i is None) or (i + 1 + first_index == expected_total)
+
+@pytest.mark.hypothesis
+@pytest.mark.slow
 @given(args=passwords_guesses_first_index_and_num_subs(max_subs=6))
 @settings(
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
 )
-def test_skipping_chars_candidates_generator(
+def test_skipping_in_candidates_from_num_subs(
     args: tuple[str, str, int, int],
 ):
 
