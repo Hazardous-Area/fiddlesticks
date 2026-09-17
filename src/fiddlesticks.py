@@ -328,8 +328,6 @@ def _calculate_sub_totals(
         }
         if sum(sub_d.values()) >= 1:
             d[num_subs] = sub_d
-        else:
-            print("Yep")
 
     return d
 
@@ -338,21 +336,21 @@ def _candidates_from_first_index(
     first_index: int,
     sub_totals: dict[int, dict[str, int]],
     guesses_alts: dict[str, dict[int, list[str]]],
-    total: int,
 ) -> Iterator[tuple[str, int]]:
     num_skipped = 0
     for num_subs, d in sub_totals.items():
         sub_total = sum(d.values())
         if first_index >= num_skipped + sub_total:
             num_skipped += sub_total
+            print(f"Skipping {num_subs=} ({first_index=}, {sub_total=})")
             continue
-
         yield from _roundrobin_all_guesses(
             num_subs=num_subs,
             guesses_alts=guesses_alts,
             guesses_sub_totals=d,
             first_index=first_index - num_skipped,
         )
+        first_index = 0
 
 
 def candidate_passwords_from_alt_chars(
@@ -369,15 +367,15 @@ def candidate_passwords_from_alt_chars(
     guesses_alts = _make_guesses_alt_chars(guesses, alt_char_map)
 
     sub_totals = _calculate_sub_totals(guesses_alts, min_subs, max_subs)
-    total_num_candidates = sum(
-        sum(guess_totals.values()) for guess_totals in sub_totals.values()
+    total_num_candidates = (
+        sum(sum(guess_totals.values()) for guess_totals in sub_totals.values())
+        - first_index
     )
 
     candidates = _candidates_from_first_index(
         first_index=first_index,
         sub_totals=sub_totals,
         guesses_alts=guesses_alts,
-        total=total_num_candidates,
     )
 
     return total_num_candidates, candidates
