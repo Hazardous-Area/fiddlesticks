@@ -120,23 +120,26 @@ def test_piping_candidates_from_alt_char_map(
 
 
 def _collate_args(
-    num_subs: int,
+    max_subs: int,
     guesses: list[str],
     *args: str,
     shell: bool = False,
+    new_search: bool = True,
 ) -> list[str]:
     # Collates args for subprocess.run, the entire command
     # used to test fiddlesticks.  I.e. not necessarily just
     # the args for fiddlesticks, e.g. Bash external to it
     # could be included too.
-    pwd_args = [f"--password-guess={guess}" for guess in guesses]
+    optional_args = [f"--password-guess={guess}" for guess in guesses]
+    if new_search:
+        optional_args.append("--new-search")
     if shell:
-        pwd_args = [shlex.quote(pwd_arg) for pwd_arg in pwd_args]
+        optional_args = [shlex.quote(opt_arg) for opt_arg in optional_args]
     return [
         "fiddlesticks",
         "--max-subs",
-        f"{num_subs}",
-        *pwd_args,
+        f"{max_subs}",
+        *optional_args,
         *args,
     ]
 
@@ -147,13 +150,14 @@ def _run_fiddlesticks_without_extract_to(
     file: Path | None,
     _tmp_dir_path: str | Path,
     *args: str,
+    new_search: bool = True,
 ):
     other_args = list(args)
     if file is not None:
         other_args.append(str(file))
 
     return subprocess.run(
-        _collate_args(max_num_subs, guesses, *other_args),
+        _collate_args(max_num_subs, guesses, *other_args, new_search=new_search),
         capture_output=True,
         check=False,
         env={
@@ -230,6 +234,48 @@ def test_default_command_with_docx_bad_guess_and_verbose():
         check=False,
     )
     assert result.returncode == 1
+
+
+def test_first_index_with_num_subs_4_default_command_and_docx():
+    result = subprocess.run(
+        _collate_args(4, ["7357"], DOCX_FILE.as_posix(), "--first-index", "270"),
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0
+
+
+@pytest.mark.parametrize(
+    "file",
+    [DOCX_FILE],
+)
+def test_no_resuming(file, tmp_path):
+    max_subs_2_result = _run_fiddlesticks_without_extract_to(
+        2, ["te57"], file, tmp_path, new_search=True
+    )
+    assert max_subs_2_result.returncode == 0
+    assert max_subs_2_result.stderr.splitlines()[-1].startswith(
+        b"Found password (candidate index: 43) in "
+    )
+
+
+@pytest.mark.parametrize(
+    "file",
+    [DOCX_FILE],
+)
+def test_resuming_from_progress_file(file, tmp_path):
+    max_subs_1_result = _run_fiddlesticks_without_extract_to(
+        1, ["te57"], file, tmp_path, new_search=True
+    )
+    assert max_subs_1_result.returncode == 1
+    print(f"{list(tmp_path.iterdir())}")
+    max_subs_2_result = _run_fiddlesticks_without_extract_to(
+        2, ["te57"], file, tmp_path, "-v", "--resume", new_search=False
+    )
+    assert max_subs_2_result.returncode == 0
+    assert max_subs_2_result.stderr.splitlines()[-1].startswith(
+        b"Found password (candidate index: 32) in "
+    ), max_subs_2_result.stderr
 
 
 @pytest.mark.skipif(

@@ -1,3 +1,4 @@
+import builtins  # noqa: F401
 import io
 from pathlib import Path
 from unittest.mock import patch
@@ -15,6 +16,7 @@ from fiddlesticks import (
     _get_hopefully_incorrect_password,
     cli,
     handle_found_password_output,
+    offer_to_skip_indices_ruled_out_by_progress_file,
 )
 
 from .helpers import (
@@ -22,6 +24,7 @@ from .helpers import (
     SEVEN_ZIP_TEST_ARCHIVE,
     XLSX_FILE,
     _assert_output_on_found_password,
+    _create_random_progress_file,
     _try_make_ssh_key_files,
 )
 
@@ -31,7 +34,9 @@ from .helpers import (
 )
 def test_password_from_getpass_in_CLI(capsys):
     with patch("getpass.getpass", side_effect=["test", ""]):
-        assert 0 == cli(["--max-subs", "0", str(SEVEN_ZIP_TEST_ARCHIVE)])
+        assert 0 == cli(
+            ["--new-search", "--max-subs", "0", str(SEVEN_ZIP_TEST_ARCHIVE)]
+        )
     capsys.readouterr()
 
 
@@ -122,3 +127,39 @@ def test_msoffice_crypto_tools(path: Path):
 
     office_file.load_key(password="test")
     office_file.decrypt(stream)
+
+
+def test_offer_to_skip_indices_ruled_out_by_progress_file(tmp_path):
+    progress_file, indices = _create_random_progress_file(
+        tmp_path / "test_progress_file.json"
+    )
+
+    with patch("builtins.input", side_effect=["y"]):
+        assert indices[0] + 1 == offer_to_skip_indices_ruled_out_by_progress_file(
+            force_resume=False,
+            saved_progress_file=progress_file,
+        )
+
+
+def test_bad_progress_file(tmp_path):
+    progress_file = tmp_path / "test_progress_file.json"
+    progress_file.write_text("{")  # Invalid JSON
+
+    index = offer_to_skip_indices_ruled_out_by_progress_file(
+        force_resume=False,
+        saved_progress_file=progress_file,
+    )
+    assert index == 0
+
+
+def test_user_declines_to_skip_indices_ruled_out_by_progress_file(tmp_path):
+    progress_file, _ = _create_random_progress_file(
+        tmp_path / "test_progress_file.json"
+    )
+
+    with patch("builtins.input", side_effect=["n"]):
+        index = offer_to_skip_indices_ruled_out_by_progress_file(
+            force_resume=False,
+            saved_progress_file=progress_file,
+        )
+    assert index == 0
