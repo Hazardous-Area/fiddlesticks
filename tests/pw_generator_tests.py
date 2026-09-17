@@ -72,9 +72,8 @@ def test_no_guesses():
 
 @pytest.mark.hypothesis
 @pytest.mark.slow
-@given(args=guesses_max_subs_and_first_index(max_max_subs=3, max_num_pws=4))
+@given(args=guesses_max_subs_and_first_index())
 @settings(
-    max_examples=3,
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
 )

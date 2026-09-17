@@ -215,23 +215,23 @@ def _roundrobin_all_guesses(
     first_index: int = 0,
 ) -> Iterator[tuple[str, int]]:
 
-    num_skipped = num_skipped_per_unexhausted_iterator = 0
+    num_skipped = num_skipped_per_unexhausted_iterator = smallest_iterator_length = 0
 
     iterator_lengths = sorted((n, i) for i, n in enumerate(guesses_sub_totals.values()))
     # Add items yielded by Round Robin, allowing for removal of exhausted iterators
     while iterator_lengths:
+        prev_smallest_iterator_length = smallest_iterator_length
         smallest_iterator_length = iterator_lengths[0][0]
+        num_left_in_shortest = smallest_iterator_length - prev_smallest_iterator_length
         L = len(iterator_lengths)
-        num_items_this_block = smallest_iterator_length * L
-
-        if first_index < num_skipped + num_items_this_block:
+        num_skipped_this_block = num_left_in_shortest * L
+        if first_index < num_skipped + num_skipped_this_block:
             break
-
         while iterator_lengths and iterator_lengths[0][0] == smallest_iterator_length:
             iterator_lengths.pop(0)
 
-        num_skipped += num_items_this_block
-        num_skipped_per_unexhausted_iterator += smallest_iterator_length
+        num_skipped += num_skipped_this_block
+        num_skipped_per_unexhausted_iterator += num_left_in_shortest
 
     first_index_this_block = first_index - num_skipped
     iterator_indices_this_block = sorted(i for n, i in iterator_lengths)
@@ -274,14 +274,13 @@ def _roundrobin_all_guesses(
         # Skip if the offset wraps into next block, but the iterator
         # was already exhausted in this block.
         #
-        # num_skipped + num_items_this_block is the first index in the next block
+        # num_skipped + num_skipped_this_block is the first index in the next block
         # and the last iterator's offset from the first (0) could be + L-1
         if (
-            first_index > num_skipped + num_items_this_block - L
+            first_index > num_skipped + num_skipped_this_block - L
             and guess_it_length == smallest_iterator_length  # was exhausted this block
         ):
             continue
-
         iterators.append(
             _candidates_from_num_subs(
                 guess,
@@ -342,7 +341,6 @@ def _candidates_from_first_index(
         sub_total = sum(d.values())
         if first_index >= num_skipped + sub_total:
             num_skipped += sub_total
-            print(f"Skipping {num_subs=} ({first_index=}, {sub_total=})")
             continue
         yield from _roundrobin_all_guesses(
             num_subs=num_subs,
