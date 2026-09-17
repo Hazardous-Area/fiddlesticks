@@ -89,20 +89,26 @@ def test_skipping_in_candidate_passwords_from_alt_chars(
         max_subs=max_subs,
         first_index=first_index,
     )
-    expected_total, expected_guesses_it = fiddlesticks.candidate_passwords_from_alt_chars(
-        guesses=guesses,
-        max_subs=max_subs,
-        first_index=0,
+    expected_total, expected_guesses_it = (
+        fiddlesticks.candidate_passwords_from_alt_chars(
+            guesses=guesses,
+            max_subs=max_subs,
+            first_index=0,
+        )
     )
     for _ in range(first_index):
         next(expected_guesses_it)
     i = None
-    for i, (actual, expected) in enumerate(itertools.zip_longest(actual_guesses_it, expected_guesses_it)):
+    for i, (actual, expected) in enumerate(
+        itertools.zip_longest(actual_guesses_it, expected_guesses_it)
+    ):
         assert actual == expected
 
+    assert (actual_total == 0 and i is None) or (i == actual_total - 1)
+    assert (expected_total == 0 and i is None) or (
+        i == expected_total - 1 - first_index
+    )
 
-    assert (actual_total ==0 and i is None) or (i + 1 == actual_total)
-    assert (expected_total == 0 and i is None) or (i + 1 + first_index == expected_total)
 
 @pytest.mark.hypothesis
 @pytest.mark.slow
@@ -202,7 +208,7 @@ def test_round_robin_wrapping_to_next_block(
 
 
 @pytest.mark.parametrize(
-    "guesses,max_subs,first_index,mapping,total,expected",
+    "guesses,max_subs,first_index,mapping,expected",
     [
         (
             [
@@ -217,7 +223,6 @@ def test_round_robin_wrapping_to_next_block(
                 "2": ['"'],
                 "1": ["!"],
             },
-            6,
             [
                 ("3", 0),
                 ("2", 0),
@@ -234,7 +239,6 @@ def test_candidates_from_first_index_skips_to_next_num_subs(
     max_subs: int,
     first_index: int,
     mapping: dict[str, list[str]],
-    total: int,
     expected: list[str],
 ):
     guesses_alts = fiddlesticks._make_guesses_alt_chars(guesses, mapping)
@@ -247,7 +251,6 @@ def test_candidates_from_first_index_skips_to_next_num_subs(
             first_index=first_index,
             sub_totals=guesses_sub_totals,
             guesses_alts=guesses_alts,
-            total=total,
         )
     )
 
