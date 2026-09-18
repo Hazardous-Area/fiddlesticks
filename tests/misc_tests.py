@@ -1,4 +1,5 @@
 import builtins  # noqa: F401
+import contextlib
 import io
 import json
 import tempfile
@@ -134,7 +135,7 @@ def test_msoffice_crypto_tools(path: Path):
     office_file.decrypt(stream)
 
 
-def test_offer_to_skip_indices_ruled_out_by_progress_file(tmp_path):
+def test_offer_to_skip_indices_ruled_out_by_progress_file(tmp_path, capsys):
     progress_file, indices = _create_random_progress_file(
         tmp_path / "test_progress_file.json"
     )
@@ -144,6 +145,7 @@ def test_offer_to_skip_indices_ruled_out_by_progress_file(tmp_path):
             force_resume=False,
             saved_progress_file=progress_file,
         )
+    capsys.readouterr()
 
 
 def test_bad_progress_file(tmp_path):
@@ -157,7 +159,7 @@ def test_bad_progress_file(tmp_path):
     assert index == 0
 
 
-def test_user_declines_to_skip_indices_ruled_out_by_progress_file(tmp_path):
+def test_user_declines_to_skip_indices_ruled_out_by_progress_file(tmp_path, capsys):
     progress_file, _ = _create_random_progress_file(
         tmp_path / "test_progress_file.json"
     )
@@ -168,6 +170,7 @@ def test_user_declines_to_skip_indices_ruled_out_by_progress_file(tmp_path):
             saved_progress_file=progress_file,
         )
     assert index == 0
+    capsys.readouterr()
 
 
 @composite
@@ -194,10 +197,11 @@ def ruled_out_candidates_indices(draw) -> tuple[list[int], int]:
 def test_save_ruled_out_indices_to_progress_file(args: tuple[list[int], int]):
     untrimmed_indices, smallest_after_trimming = args
 
+    stream = io.StringIO()
     # Just create a tempdir manually as hypothesis' decorators
     # don't play nicely with test functions
     # that use function-scoped fixtures like Pytest's tmp_path.
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with contextlib.redirect_stderr(stream), tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
         progress_file = tmp_path / "test_progress_file.json"
         save_ruled_out_indices_to_progress_file(untrimmed_indices, progress_file)
