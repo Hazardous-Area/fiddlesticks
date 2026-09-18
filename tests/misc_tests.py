@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.serialization import (
     load_pem_private_key,
     load_ssh_private_key,
 )
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis.strategies import composite, integers, lists
 
 from fiddlesticks import (
@@ -173,14 +173,12 @@ def test_user_declines_to_skip_indices_ruled_out_by_progress_file(tmp_path):
 @composite
 def ruled_out_candidates_indices(draw) -> tuple[list[int], int]:
     i = draw(integers(min_value=0))
-    j = draw(integers(min_value=i, max_size = i+1000))
-    extras = draw(lists(integers(min_value=j + 2, max_size=j+1000), max_size=100))
+    j = draw(integers(min_value=i, max_value=i + 1000))
+    extras = draw(lists(integers(min_value=j + 2, max_value=j + 1000), max_size=100))
     return [*range(i, j + 1), *extras], j
 
 
-@pytest.mark.skipif(
-    IS_WINDOWS, reason="Crashes_with_memory_error"
-)
+@pytest.mark.skipif(IS_WINDOWS, reason="Crashes_with_memory_error")
 @pytest.mark.hypothesis
 @pytest.mark.slow
 @settings(
