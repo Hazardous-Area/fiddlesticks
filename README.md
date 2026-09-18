@@ -133,7 +133,7 @@ the number of substitutions required for each candidate can be capped by setting
 If a file is specified in `--output-file` or `-o` Fiddlesticks will write a successfully found 
 password to it.  Unless `-P` or `--print-passwords` is set, Fiddlesticks does not print any 
 candidate passwords by default (on successfully finding a password, the
-candidate number is printed; candidate generation is deterministic).
+candidate index is printed; candidate generation is deterministic).
 The number of output messages (printed to stderr) can be increased by raising 
 the verbosity, by setting `-v` or `--verbosity`, once or twice (e.g. `-vv`).
 "Two" is the maximum verbosity available. 

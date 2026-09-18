@@ -1,3 +1,5 @@
+import json
+import random
 import string
 import subprocess
 from pathlib import Path
@@ -286,7 +288,7 @@ def _assert_output_on_found_password(
 ) -> None:
     assert not stdout
     assert "Found password" in stderr, f"{stderr=}"
-    assert f"candidate number: {i}" in stderr, f"{stderr=}"
+    assert f"candidate index: {i}" in stderr, f"{stderr=}"
     if print_passwords:
         assert password in stderr, f"{stderr=}"
     else:
@@ -320,3 +322,9 @@ def _try_make_veracrypt_volume(
         capture_output=True,
         shell=True,
     )
+
+
+def _create_random_progress_file(progress_file: Path) -> tuple[Path, list[int]]:
+    indices = sorted(random.randint(0, 10000) for _ in range(random.randint(0, 100)))
+    progress_file.write_text(json.dumps({"ruled_out_candidates_indices": indices}))
+    return progress_file, indices

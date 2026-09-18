@@ -41,8 +41,11 @@ from itertools import combinations, cycle, islice, product
 from pathlib import Path
 from typing import cast
 
-TMP_DIR = Path(tempfile.gettempdir()) / "fiddlesticks"
+TMP_DIR = (
+    Path(tempfile.gettempdir()) / "fiddlesticks"
+)  # Tests set an env var which gettempdir searches
 TMP_DIR.mkdir(exist_ok=True)
+DEFAULT_PROGRESS_FILE = TMP_DIR / "fiddlesticks_progress.json"
 IS_WINDOWS = sys.platform == "win32"
 
 
@@ -387,7 +390,7 @@ def handle_found_password_output(
     output_file: str = "",
     **kwargs,
 ):
-    msg = f"\n Found password (candidate number: {i})"
+    msg = f"\nFound password (candidate index: {i})"
     if t is not None:
         msg = f"{msg} in {t:.3f} seconds"
     print_to_stderr(msg, end="")
@@ -725,6 +728,59 @@ def make_Veracrypt_checker(file: os.PathLike, **kwargs):
     return make_subprocess_checker(*args)
 
 
+def save_ruled_out_indices_to_progress_file(
+    indices: list[int],
+    saved_progress_file: Path = DEFAULT_PROGRESS_FILE,
+):
+    saved_indices: list[int]
+    if saved_progress_file.is_file():
+        saved_indices = json.loads(saved_progress_file.read_text())[
+            "ruled_out_candidates_indices"
+        ]
+    else:
+        saved_indices = []
+
+    saved_indices.extend(indices)
+    saved_indices.sort()
+
+    # Drop any initial sequence of consecutive indices
+    # (we assume all consecutive ones below the lowest saved one
+    #  have all been rules out)
+    i = 0
+    while i + 1 < len(saved_indices) and saved_indices[i + 1] <= saved_indices[i] + 1:
+        i += 1
+    del saved_indices[:i]
+
+    saved_progress_file.write_text(
+        json.dumps({"ruled_out_candidates_indices": saved_indices})
+    )
+
+
+def offer_to_skip_indices_ruled_out_by_progress_file(
+    force_resume: bool = False,
+    saved_progress_file: Path = DEFAULT_PROGRESS_FILE,
+) -> int:
+    resume_from = None
+    try:
+        progress_text = saved_progress_file.read_text()
+        progress_dict = json.loads(progress_text)
+        ruled_out = progress_dict["ruled_out_candidates_indices"]
+        resume_from = ruled_out[0] + 1
+    except (OSError, json.decoder.JSONDecodeError, KeyError, IndexError, TypeError):
+        pass
+    if resume_from is not None:
+        print_to_stderr(f"Found previous progress in {saved_progress_file}. ")
+        if (
+            force_resume
+            or input(
+                f"Start from index {resume_from} read from this file? (y/n) "
+            ).lower()
+            == "y"
+        ):
+            return resume_from
+    return 0
+
+
 def check_passwords_sequentially(
     candidates: Iterable[tuple[str, int]],
     test_func: Callable[[str], bool],
@@ -736,7 +792,7 @@ def check_passwords_sequentially(
     **kwargs,
 ) -> tuple[str, int] | None:
 
-    out_of_total = "" if total is None else f"/{total}"
+    out_of_total = "" if total is None else f"/{total - 1}"  # Highest index
 
     if update_every is None:
         update_every = 40 if total is None else max(1, total // 300)
@@ -748,6 +804,8 @@ def check_passwords_sequentially(
     for i, (candidate, num_subs) in enumerate(candidates, start=first_index):
         if test_func(candidate):
             return candidate, i
+
+        save_ruled_out_indices_to_progress_file([i])
 
         if i % update_every:
             continue
@@ -806,16 +864,23 @@ def _default_factory_selector(*args: str):
 parser = argparse.ArgumentParser(prog="fiddlesticks")
 parser.suggest_on_error = True  # type: ignore
 parser.add_argument(
+    "--new-search",
+    action="store_true",
+    help=(
+        "Don't offer to resume a previous interrupted search from saved progress (if available). "
+    ),
+)
+parser.add_argument(
     "--resume",
-    type=bool,
-    default=False,
-    help=("Try to resume a previous interrupted search, from a saved index. "),
+    "-y",
+    action="store_true",
+    help=("Always resume a previous interrupted search when possible. "),
 )
 parser.add_argument(
     "--first-index",
     type=int,
-    default=0,
-    help=("Try to resume a previous interrupted search, from a saved index. "),
+    default=None,
+    help=("First index of candidate to start checking from. "),
 )
 parser.add_argument(
     "--max-subs",
@@ -1044,7 +1109,17 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
             password_guesses.append(password_guess)
 
     extras = kwargs.pop("extras")
-    _resume = kwargs.pop("resume")
+    print_to_stderr(f"{ns.new_search=}")
+    new_search = kwargs.pop("new_search")
+    force_resume = kwargs.pop("resume")
+    first_index: int | None = kwargs.pop("first_index")
+    print_to_stderr(f"{first_index=}")
+    if first_index is None:
+        print_to_stderr(f"{new_search=}")
+        if not new_search and DEFAULT_PROGRESS_FILE.is_file():
+            first_index = offer_to_skip_indices_ruled_out_by_progress_file(force_resume)
+        else:
+            first_index = 0
 
     if ns.command is None:
         command = _default_factory_selector(*extras)
@@ -1066,12 +1141,12 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         warnings.warn(
             "The SSH key, Keepass and the Aegis vault checkers do not decrypt files. "
             "When running fiddlesticks without print-passwords, without "
-            "an output-file, and with verbosity=0, only the candidate number "
+            "an output-file, and with verbosity=0, only the candidate index "
             "of any recovered password will be printed. "
         )
 
     total, candidates = ns.password_generator(
-        first_index=ns.first_index,
+        first_index=first_index,
         guesses=password_guesses,
         min_subs=ns.min_subs,
         max_subs=ns.max_subs,
