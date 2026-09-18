@@ -178,6 +178,9 @@ def ruled_out_candidates_indices(draw) -> tuple[list[int], int]:
     return [*range(i, j + 1), *extras], j
 
 
+@pytest.mark.skipif(
+    IS_WINDOWS, reason="Crashes_with_memory_error"
+)
 @pytest.mark.hypothesis
 @pytest.mark.slow
 @given(args=ruled_out_candidates_indices())
