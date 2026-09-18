@@ -761,12 +761,18 @@ def offer_to_skip_indices_ruled_out_by_progress_file(
     saved_progress_file: Path = DEFAULT_PROGRESS_FILE,
 ) -> int:
     resume_from = None
+    progress_text = saved_progress_file.read_text()
+
+    # Clear previous session's progress.  We've done all we can with it now.
+    saved_progress_file.unlink()
     try:
-        progress_text = saved_progress_file.read_text()
         progress_dict = json.loads(progress_text)
-        ruled_out = progress_dict["ruled_out_candidates_indices"]
+        ruled_out = sorted(progress_dict["ruled_out_candidates_indices"])
+        # Could search through ruled_out
+        # to find the lowest index that's not ruled out (that's higher
+        # than the lowest one that is).
         resume_from = ruled_out[0] + 1
-    except (OSError, json.decoder.JSONDecodeError, KeyError, IndexError, TypeError):
+    except (json.decoder.JSONDecodeError, KeyError, IndexError, TypeError):
         pass
     if resume_from is not None:
         print_to_stderr(f"Found previous progress in {saved_progress_file}. ")
@@ -777,6 +783,7 @@ def offer_to_skip_indices_ruled_out_by_progress_file(
             ).lower()
             == "y"
         ):
+            save_ruled_out_indices_to_progress_file([ruled_out[0]], saved_progress_file)
             return resume_from
     return 0
 
@@ -1109,17 +1116,18 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
             password_guesses.append(password_guess)
 
     extras = kwargs.pop("extras")
-    print_to_stderr(f"{ns.new_search=}")
     new_search = kwargs.pop("new_search")
     force_resume = kwargs.pop("resume")
     first_index: int | None = kwargs.pop("first_index")
-    print_to_stderr(f"{first_index=}")
-    if first_index is None:
-        print_to_stderr(f"{new_search=}")
-        if not new_search and DEFAULT_PROGRESS_FILE.is_file():
+
+    if DEFAULT_PROGRESS_FILE.is_file():
+        if not new_search and first_index is None:
             first_index = offer_to_skip_indices_ruled_out_by_progress_file(force_resume)
         else:
-            first_index = 0
+            DEFAULT_PROGRESS_FILE.unlink()
+
+    if first_index is None:
+        first_index = 0
 
     if ns.command is None:
         command = _default_factory_selector(*extras)

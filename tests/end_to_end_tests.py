@@ -263,12 +263,11 @@ def test_no_resuming(file, tmp_path):
     "file",
     [DOCX_FILE],
 )
-def test_resuming_from_progress_file(file, tmp_path):
+def test_resuming_from_progress_file(file, tmp_path, capsys):
     max_subs_1_result = _run_fiddlesticks_without_extract_to(
         1, ["te57"], file, tmp_path, new_search=True
     )
     assert max_subs_1_result.returncode == 1
-    print(f"{list(tmp_path.iterdir())}")
     max_subs_2_result = _run_fiddlesticks_without_extract_to(
         2, ["te57"], file, tmp_path, "-v", "--resume", new_search=False
     )
@@ -276,6 +275,7 @@ def test_resuming_from_progress_file(file, tmp_path):
     assert max_subs_2_result.stderr.splitlines()[-1].startswith(
         b"Found password (candidate index: 32) in "
     ), max_subs_2_result.stderr
+    capsys.readouterr()
 
 
 @pytest.mark.skipif(
