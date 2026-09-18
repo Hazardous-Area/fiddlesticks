@@ -1,5 +1,7 @@
 import builtins  # noqa: F401
 import io
+import json
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,6 +12,8 @@ from cryptography.hazmat.primitives.serialization import (
     load_pem_private_key,
     load_ssh_private_key,
 )
+from hypothesis import HealthCheck, given, settings
+from hypothesis.strategies import composite, integers, lists
 
 from fiddlesticks import (
     IS_WINDOWS,
@@ -17,6 +21,7 @@ from fiddlesticks import (
     cli,
     handle_found_password_output,
     offer_to_skip_indices_ruled_out_by_progress_file,
+    save_ruled_out_indices_to_progress_file,
 )
 
 from .helpers import (
@@ -163,3 +168,46 @@ def test_user_declines_to_skip_indices_ruled_out_by_progress_file(tmp_path):
             saved_progress_file=progress_file,
         )
     assert index == 0
+
+
+@composite
+def ruled_out_candidates_indices(draw) -> tuple[list[int], int]:
+    i = draw(integers(min_value=0))
+    j = draw(integers(min_value=i, max_value=i + 1000))
+    extras = draw(lists(integers(min_value=j + 2, max_value=j + 1000), max_size=100))
+    return [*range(i, j + 1), *extras], j
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="Crashes_with_memory_error")
+@pytest.mark.hypothesis
+@pytest.mark.slow
+@settings(
+    max_examples=3,
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
+    deadline=None,
+    database=None,
+    derandomize=True,  # Without this, the test doesn't complete in less than 5 mins in Github Actions
+    # (despite that the default is True in CI ???
+    # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
+)
+@given(args=ruled_out_candidates_indices())
+def test_save_ruled_out_indices_to_progress_file(args: tuple[list[int], int]):
+    untrimmed_indices, smallest_after_trimming = args
+
+    # Just create a tempdir manually as hypothesis' decorators
+    # don't play nicely with test functions
+    # that use function-scoped fixtures like Pytest's tmp_path.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        progress_file = tmp_path / "test_progress_file.json"
+        save_ruled_out_indices_to_progress_file(untrimmed_indices, progress_file)
+        trimmed_indices = json.loads(progress_file.read_text())[
+            "ruled_out_candidates_indices"
+        ]
+
+        starting_index = offer_to_skip_indices_ruled_out_by_progress_file(
+            True, progress_file
+        )
+
+    assert smallest_after_trimming == trimmed_indices[0]
+    assert smallest_after_trimming + 1 == starting_index
