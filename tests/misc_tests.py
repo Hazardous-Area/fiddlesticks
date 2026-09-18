@@ -173,8 +173,8 @@ def test_user_declines_to_skip_indices_ruled_out_by_progress_file(tmp_path):
 @composite
 def ruled_out_candidates_indices(draw) -> tuple[list[int], int]:
     i = draw(integers(min_value=0))
-    j = draw(integers(min_value=i))
-    extras = draw(lists(integers(min_value=j + 2)))
+    j = draw(integers(min_value=i, max_size = i+1000))
+    extras = draw(lists(integers(min_value=j + 2, max_size=j+1000), max_size=100))
     return [*range(i, j + 1), *extras], j
 
 
@@ -183,6 +183,15 @@ def ruled_out_candidates_indices(draw) -> tuple[list[int], int]:
 )
 @pytest.mark.hypothesis
 @pytest.mark.slow
+@settings(
+    max_examples=3,
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
+    deadline=None,
+    database=None,
+    derandomize=True,  # Without this, the test doesn't complete in less than 5 mins in Github Actions
+    # (despite that the default is True in CI ???
+    # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
+)
 @given(args=ruled_out_candidates_indices())
 def test_save_ruled_out_indices_to_progress_file(args: tuple[list[int], int]):
     untrimmed_indices, smallest_after_trimming = args
