@@ -2,38 +2,14 @@ import queue
 from collections.abc import Callable
 from multiprocessing import Event, Process, Queue
 from multiprocessing.synchronize import Event as EventT
-from typing import NamedTuple, Self
+from typing import NamedTuple, Self, Iterable
 
-# Num subs
-# Guess number
-# -- Compute indices with alts under given map--
-# Indices combo number
-# -- Compute list of alts --
-# Alts product number
-
-
-class GuessData(NamedTuple):
-    guesses: list[str]
-    num_subs: int
-    num_guesses_left: int
-    guess_index: int
-    guess_char_indices_combo: list[int]
-    char_alts_indices: list[int]  # from product
-
-    def to_string(self) -> str:
-        raise NotImplementedError
-        return ""
-
-    @classmethod
-    def from_index(cls, i: int) -> Self:
-        raise NotImplementedError
-        return cls()
 
 
 def _make_worker_loop_body(
     pw_found: EventT,
-    guess_indices: Queue[int],
-    failed_indices: Queue[int],
+    guesses: Queue[str],
+    incorrect_guesses: Queue[str],
     checker: Callable[[str], bool],
 ):
     def work():
@@ -41,16 +17,15 @@ def _make_worker_loop_body(
             return False
 
         try:
-            guess_index = guess_indices.get(timeout=10)
+            guess = guesses.get(timeout=10)
         except queue.Empty:
             return False
 
-        guess = GuessData.from_index(guess_index).to_string()
         if checker(guess):
             pw_found.set()
             return False
 
-        failed_indices.put(guess_index)
+        incorrect_guesses.put(guess)
         return True
 
     return work()
@@ -58,12 +33,12 @@ def _make_worker_loop_body(
 
 def make_worker(
     pw_found: EventT,
-    guess_indices: Queue[int],
-    failed_indices: Queue[int],
+    queued_guesses: Queue[str],
+    incorrect_guesses: Queue[str],
     checker: Callable[[str], bool],
 ):
 
-    work = _make_worker_loop_body(pw_found, guess_indices, failed_indices, checker)
+    work = _make_worker_loop_body(pw_found, queued_guesses, incorrect_guesses, checker)
 
     def worker():
         while work():
@@ -72,13 +47,13 @@ def make_worker(
     return worker
 
 
-def report(indices: list[int]):
+def report(incorrect_guesses: list[str]):
     pass
 
 
 def parent(
     checker: Callable[[str], bool],
-    guess_indices_it,
+    guesses: Iterable[str],
     N: int = 0,
     initial_guess_index: int = 0,
     min_queue_size=1_000,
@@ -86,19 +61,19 @@ def parent(
 ):
 
     pw_found = Event()
-    guess_indices = Queue[int](maxsize=max_queue_size)
-    failed_indices = Queue[int](maxsize=max_queue_size)
+    queued_guesses = Queue[str](maxsize=max_queue_size)
+    incorrect_guesses = Queue[str](maxsize=max_queue_size)
     N = 16
 
     workers = [
         Process(
-            target=make_worker(pw_found, guess_indices, failed_indices, checker),
+            target=make_worker(pw_found, queued_guesses, incorrect_guesses, checker),
             args=(),
         )
         for _ in range(N)
     ]
     parent_work = _make_worker_loop_body(
-        pw_found, guess_indices, failed_indices, checker
+        pw_found, queued_guesses, incorrect_guesses, checker
     )
 
     unqueued_candidates = True
@@ -107,23 +82,23 @@ def parent(
         worker.start()
 
     while not pw_found.is_set():
-        approx_queue_size = guess_indices.qsize()
+        approx_queue_size = queued_guesses.qsize()
         if unqueued_candidates and approx_queue_size <= min_queue_size:
             # Or while workers not timed out
-            index = next(guess_indices_it, None)
-            if index is None:
+            guess = next(guesses, None)
+            if guess is None:
                 unqueued_candidates = False
             else:
-                guess_indices.put(index)
+                queued_guesses.put(guess)
                 continue
 
-        newly_failed_indices = []
+        newly_incorrect_guesses = []
         while True:
             try:
-                newly_failed_indices.append(failed_indices.get_nowait())
+                newly_incorrect_guesses.append(incorrect_guesses.get_nowait())
             except queue.Empty:
                 break
-        report(newly_failed_indices)
+        report(newly_incorrect_guesses)
 
         more_work = parent_work()
         if not more_work:
