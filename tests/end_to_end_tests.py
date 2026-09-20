@@ -409,7 +409,7 @@ def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, file: st
         [guess],
         "--shell",
         "--",  # Tell argparse all subsequent args are positional
-        "7z",  # Taken from make_7zip_checker
+        "7z",  # Taken from SevenZipChecker
         "x",
         f"-o{test_extracted_dir}",
         file,
@@ -422,9 +422,11 @@ def pipe_to_bash_while_loop_collater(
     num_subs: int, test_extracted_dir: Path, guess: str, file: str
 ):
 
-    script_text = fiddlesticks.PERSISTENT_7Z_CHECKER_OUTLINE.format(
-        extract_to=str(test_extracted_dir),
-        file=file,
+    script_text = (
+        fiddlesticks.Persistent7zipChecker.PERSISTENT_7Z_CHECKER_OUTLINE.format(
+            extract_to=str(test_extracted_dir),
+            file=file,
+        )
     )
     script = Path("persistent_checker.sh")
     script.write_text(script_text)
