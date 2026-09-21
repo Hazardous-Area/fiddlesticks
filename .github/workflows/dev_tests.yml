@@ -61,14 +61,14 @@ jobs:
         . ./.venv/bin/activate
         pip install -e . --group=test
 
-    - name: Run PyTest
+    - name: Run Multicore smoke test
       run: |
         . ./.venv/bin/activate
         pytest dev/sketch_multicore.py
 
+    
 
-
-    # - name: Run PyTest
+    # - name: Run PW candidate Generator regression tests (to check refactor)
     #   run: |
     #     . ./.venv/bin/activate
     #     pytest dev/pw_generator_regression_tests.py

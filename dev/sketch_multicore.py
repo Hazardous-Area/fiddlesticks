@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import queue
 import sys
 from collections.abc import Callable, Iterable
@@ -9,7 +10,6 @@ from fiddlesticks import (
     candidate_passwords_from_alt_chars,
     make_MS_Office_files_key_checker,
 )
-from tests.helpers import XLSX_FILE
 
 type GuessInfo = tuple[int, tuple[str, int]]
 
@@ -140,6 +140,7 @@ def parent(
 
 
 def main():
+    xlsx_file = Path(__file__).parent.parent / "tests" / "data_files" / "test.xlsx"
     checker = make_MS_Office_files_key_checker(XLSX_FILE)
     first_index = 0
     total, guesses = candidate_passwords_from_alt_chars(
