@@ -23,12 +23,10 @@ __version__ = "0.5.0.dev"
 
 import argparse
 import atexit
-import functools
 import getpass
 import io
 import json
 import math
-import os
 import string
 import subprocess
 import sys
@@ -38,7 +36,6 @@ import time
 import warnings
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from dataclasses import dataclass
 from itertools import combinations, cycle, islice, product
 from pathlib import Path
 from typing import cast
@@ -559,7 +556,7 @@ def make_py_avdu_aegis_checker(file: str, **kwargs):
     return checker
 
 
-def make_pykeepass_checker(file: os.PathLike, **kwargs):
+def make_pykeepass_checker(file: Path, **kwargs):
 
     from pykeepass import PyKeePass
     from pykeepass.exceptions import CredentialsError
@@ -587,7 +584,7 @@ def _get_hopefully_incorrect_password() -> str:
 def _try_make_ssh_key_checker_from_loader(
     loader,
     incorrect_password_msg: str,
-    file: os.PathLike,
+    file: Path,
     **kwargs,
 ) -> Callable[[str], bool]:
 
@@ -635,7 +632,7 @@ def _try_make_ssh_key_checker_from_loader(
     return checker
 
 
-def make_ssh_key_checker(file: os.PathLike, **kwargs):
+def make_ssh_key_checker(file: Path, **kwargs):
 
     exceptions = []
 
@@ -657,7 +654,7 @@ def make_ssh_key_checker(file: os.PathLike, **kwargs):
     )
 
 
-def make_openSSH_key_checker(file: os.PathLike, **kwargs):
+def make_openSSH_key_checker(file: Path, **kwargs):
     from cryptography.hazmat.primitives.serialization import load_ssh_private_key
 
     return _try_make_ssh_key_checker_from_loader(
@@ -668,7 +665,7 @@ def make_openSSH_key_checker(file: os.PathLike, **kwargs):
     )
 
 
-def make_ssh_pem_key_checker(file: os.PathLike, **kwargs):
+def make_ssh_pem_key_checker(file: Path, **kwargs):
     from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
     return _try_make_ssh_key_checker_from_loader(
@@ -704,33 +701,27 @@ def make_MS_Office_files_key_checker(file: Path, **kwargs):
 import msoffcrypto
 
 
-@dataclass
 class MS_OfficeFilesKeyChecker:
-    file: Path
+    def __init__(self, file: Path, **kwargs):
 
-    @functools.cached_property
-    def stream(self) -> io.BytesIO:
-        return io.BytesIO()
+        import msoffcrypto
+        import msoffcrypto.exceptions
 
-    @functools.cached_property
-    def _encrypted(self) -> io.BytesIO:
-        return io.BytesIO(self.file.read_bytes())
+        encrypted = io.BytesIO(Path(file).read_bytes())
+        self._office_file = msoffcrypto.OfficeFile(encrypted)
 
-    @functools.cached_property
-    def _office_file(self):
-        return msoffcrypto.OfficeFile(self._encrypted)
+        self._stream = io.BytesIO()
 
     def __call__(self, candidate: str) -> bool:
         self._office_file.load_key(password=candidate)
-        stream = io.BytesIO()
         try:
-            self._office_file.decrypt(stream)
+            self._office_file.decrypt(self._stream)
             return True
         except msoffcrypto.exceptions.InvalidKeyError:
             return False
 
 
-def make_Veracrypt_checker(file: os.PathLike, **kwargs):
+def make_Veracrypt_checker(file: Path, **kwargs):
 
     path = Path(file).resolve()
     assert path.is_file()
