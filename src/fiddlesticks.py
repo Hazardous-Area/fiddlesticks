@@ -592,6 +592,10 @@ def _try_make_ssh_key_checker_from_loader(
 
     private_key_data = Path(file).read_bytes()
     hopefully_incorrect_password = _get_hopefully_incorrect_password()
+
+    # Ensure that incorrect_password_msg really is the 
+    # string in the error messages for the file type of file,
+    # (e.g. the different key file formats from openssl and ssh-keygen).
     try:
         loader(private_key_data, password=hopefully_incorrect_password.encode())
     except ValueError as e:
