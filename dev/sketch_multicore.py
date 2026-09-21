@@ -1,14 +1,15 @@
 import os
-from pathlib import Path
 import queue
 import sys
 from collections.abc import Callable, Iterable
 from multiprocessing import Event, Process, Queue
 from multiprocessing.synchronize import Event as EventT
+from pathlib import Path
 
 from fiddlesticks import (
     candidate_passwords_from_alt_chars,
     make_MS_Office_files_key_checker,
+    save_ruled_out_indices_to_progress_file,
 )
 
 type GuessInfo = tuple[int, tuple[str, int]]
@@ -27,6 +28,43 @@ def get_cpu_count() -> int:
             f"Could not find number of CPU cores to run on, {cpu_count=}"
         )
     return cpu_count
+
+
+class Worker:
+    def __init__(
+        self,
+        pw_found: EventT,
+        guesses: Queue[GuessInfo],
+        incorrect_guess_indices: Queue[int],
+        checker: Callable[[str], bool],
+    ):
+        self.pw_found = pw_found
+        self.guesses = guesses
+        self.incorrect_guess_indices = incorrect_guess_indices
+        self.checker = checker
+
+    def __call__(self):
+        while self.get_and_check_next_guess():
+            pass
+
+    def get_and_check_next_guess(self) -> bool:
+
+        if self.pw_found.is_set():
+            return False
+
+        try:
+            guess_info = self.guesses.get(timeout=10)
+        except queue.Empty:
+            return False
+
+        index, (guess, _num_subs) = guess_info
+
+        if self.checker(guess):
+            self.pw_found.set()
+            return False
+
+        self.incorrect_guess_indices.put(index)
+        return True
 
 
 def _make_worker_loop_body(
@@ -74,10 +112,6 @@ def make_worker(
     return worker
 
 
-def report(incorrect_guesses: list[int]):
-    pass
-
-
 def parent(
     checker: Callable[[str], bool],
     guesses: Iterable[GuessInfo],
@@ -97,9 +131,7 @@ def parent(
 
     workers = [
         Process(
-            target=make_worker(
-                pw_found, queued_guesses, incorrect_guess_indices, checker
-            ),
+            target=Worker(pw_found, queued_guesses, incorrect_guess_indices, checker),
             args=(),
         )
         for _ in range(num_cores - 1)
@@ -132,7 +164,7 @@ def parent(
                 break
             indices.append(index)
 
-        report(indices)
+        save_ruled_out_indices_to_progress_file(indices)
 
         more_work = parent_work()
         if not more_work:
