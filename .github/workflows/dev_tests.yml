@@ -64,7 +64,7 @@ jobs:
     - name: Run Multicore smoke test
       run: |
         . ./.venv/bin/activate
-        pytest dev/sketch_multicore.py
+        python dev/sketch_multicore.py
 
     
 
