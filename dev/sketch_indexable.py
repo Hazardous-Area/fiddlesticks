@@ -6,10 +6,12 @@ from typing import NamedTuple, Self, Iterable
 
 
 
+type GuessInfo = tuple[int, tuple[str, int]]
+
 def _make_worker_loop_body(
     pw_found: EventT,
-    guesses: Queue[str],
-    incorrect_guesses: Queue[str],
+    guesses: Queue[GuessInfo],
+    incorrect_guesses: Queue[GuessInfo],
     checker: Callable[[str], bool],
 ):
     def work():
@@ -33,8 +35,8 @@ def _make_worker_loop_body(
 
 def make_worker(
     pw_found: EventT,
-    queued_guesses: Queue[str],
-    incorrect_guesses: Queue[str],
+    queued_guesses: Queue[GuessInfo],
+    incorrect_guesses: Queue[GuessInfo],
     checker: Callable[[str], bool],
 ):
 
@@ -53,7 +55,7 @@ def report(incorrect_guesses: list[str]):
 
 def parent(
     checker: Callable[[str], bool],
-    guesses: Iterable[str],
+    guesses: Iterable[GuessInfo],
     N: int = 0,
     initial_guess_index: int = 0,
     min_queue_size=1_000,
@@ -61,8 +63,8 @@ def parent(
 ):
 
     pw_found = Event()
-    queued_guesses = Queue[str](maxsize=max_queue_size)
-    incorrect_guesses = Queue[str](maxsize=max_queue_size)
+    queued_guesses = Queue[GuessInfo](maxsize=max_queue_size)
+    incorrect_guesses = Queue[GuessInfo](maxsize=max_queue_size)
     N = 16
 
     workers = [
@@ -85,11 +87,11 @@ def parent(
         approx_queue_size = queued_guesses.qsize()
         if unqueued_candidates and approx_queue_size <= min_queue_size:
             # Or while workers not timed out
-            guess = next(guesses, None)
+            guess_info = next(guesses, None)
             if guess is None:
                 unqueued_candidates = False
             else:
-                queued_guesses.put(guess)
+                queued_guesses.put(guess_info)
                 continue
 
         newly_incorrect_guesses = []
