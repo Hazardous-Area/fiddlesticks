@@ -562,9 +562,11 @@ def make_pykeepass_checker(file: os.PathLike, **kwargs):
     from pykeepass import PyKeePass
     from pykeepass.exceptions import CredentialsError
 
+    stream = io.BytesIO(Path(file).read_bytes())
+
     def checker(candidate: str) -> bool:
         try:
-            PyKeePass(file, password=candidate)
+            PyKeePass(stream, password=candidate)
             return True
         except CredentialsError:
             return False
