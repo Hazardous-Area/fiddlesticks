@@ -1,9 +1,32 @@
+import os
 import queue
+import sys
 from collections.abc import Callable, Iterable
 from multiprocessing import Event, Process, Queue
 from multiprocessing.synchronize import Event as EventT
 
+from fiddlesticks import (
+    candidate_passwords_from_alt_chars,
+    make_MS_Office_files_key_checker,
+)
+from tests.helpers import XLSX_FILE
+
 type GuessInfo = tuple[int, tuple[str, int]]
+
+
+class UnknownCPUCount(Exception):
+    pass
+
+
+def get_cpu_count() -> int:
+    cpu_count = (
+        os.process_cpu_count() if sys.version_info >= (3, 13) else os.cpu_count()
+    )
+    if cpu_count is None:
+        raise UnknownCPUCount(
+            f"Could not find number of CPU cores to run on, {cpu_count=}"
+        )
+    return cpu_count
 
 
 def _make_worker_loop_body(
@@ -58,8 +81,7 @@ def report(incorrect_guesses: list[int]):
 def parent(
     checker: Callable[[str], bool],
     guesses: Iterable[GuessInfo],
-    N: int = 0,
-    initial_guess_index: int = 0,
+    num_cores: int | None = None,
     min_queue_size=1_000,
     max_queue_size=10_000,
 ):
@@ -68,7 +90,10 @@ def parent(
     pw_found = Event()
     queued_guesses = Queue[GuessInfo](maxsize=max_queue_size)
     incorrect_guess_indices = Queue[int](maxsize=max_queue_size)
-    N = 16
+
+    if num_cores is None:
+        num_cores = get_cpu_count()
+    print(f"Using {num_cores=}")
 
     workers = [
         Process(
@@ -77,7 +102,7 @@ def parent(
             ),
             args=(),
         )
-        for _ in range(N)
+        for _ in range(num_cores - 1)
     ]
     parent_work = _make_worker_loop_body(
         pw_found, queued_guesses, incorrect_guess_indices, checker
@@ -112,3 +137,22 @@ def parent(
         more_work = parent_work()
         if not more_work:
             break
+
+
+def main():
+    checker = make_MS_Office_files_key_checker(XLSX_FILE)
+    first_index = 0
+    total, guesses = candidate_passwords_from_alt_chars(
+        guesses=["te57"],
+        first_index=first_index,
+    )
+    print(f"{total=}")
+
+    parent(
+        checker=checker,
+        guesses=enumerate(guesses, start=first_index),
+    )
+
+
+if __name__ == "__main__":
+    main()
