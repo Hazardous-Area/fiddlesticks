@@ -37,6 +37,7 @@ import time
 import warnings
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Sequence
+from dataclasses import dataclass, field
 from itertools import combinations, cycle, islice, product
 from pathlib import Path
 from typing import cast
@@ -697,6 +698,31 @@ def make_MS_Office_files_key_checker(file: os.PathLike, **kwargs):
             return False
 
     return checker
+
+
+import msoffcrypto
+
+
+@dataclass
+class MS_OfficeFilesKeyChecker:
+    file: Path
+    _stream: io.BytesIO = field(default_factory=io.BytesIO)
+
+    @property
+    def _encrypted(self) -> io.BytesIO:
+        return io.BytesIO(self.file.read_bytes())
+
+    @property
+    def _office_file(self):
+        return msoffcrypto.OfficeFile(self._encrypted)
+
+    def __call__(self, candidate: str) -> bool:
+        self._office_file.load_key(password=candidate)
+        try:
+            self._office_file.decrypt(self._stream)
+            return True
+        except msoffcrypto.exceptions.InvalidKeyError:
+            return False
 
 
 def make_Veracrypt_checker(file: os.PathLike, **kwargs):

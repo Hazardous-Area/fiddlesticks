@@ -7,8 +7,8 @@ from multiprocessing.synchronize import Event as EventT
 from pathlib import Path
 
 from fiddlesticks import (
+    MS_OfficeFilesKeyChecker,
     candidate_passwords_from_alt_chars,
-    make_MS_Office_files_key_checker,
     save_ruled_out_indices_to_progress_file,
 )
 
@@ -173,7 +173,8 @@ def parent(
 
 def main():
     xlsx_file = Path(__file__).parent.parent / "tests" / "data_files" / "test.xlsx"
-    checker = make_MS_Office_files_key_checker(xlsx_file)
+    # checker = make_MS_Office_files_key_checker(xlsx_file)
+    checker = MS_OfficeFilesKeyChecker(xlsx_file)
     first_index = 0
     total, guesses = candidate_passwords_from_alt_chars(
         guesses=["te57"],
