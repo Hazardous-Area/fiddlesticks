@@ -88,8 +88,8 @@ def parent(
 
     guesses = iter(guesses)
     pw_found = Event()
-    queued_guesses = Queue[GuessInfo](maxsize=max_queue_size)
-    incorrect_guess_indices = Queue[int](maxsize=max_queue_size)
+    queued_guesses: Queue[GuessInfo] = Queue(maxsize=max_queue_size)
+    incorrect_guess_indices: Queue[int] = Queue(maxsize=max_queue_size)
 
     if num_cores is None:
         num_cores = get_cpu_count()
@@ -141,7 +141,7 @@ def parent(
 
 def main():
     xlsx_file = Path(__file__).parent.parent / "tests" / "data_files" / "test.xlsx"
-    checker = make_MS_Office_files_key_checker(XLSX_FILE)
+    checker = make_MS_Office_files_key_checker(xlsx_file)
     first_index = 0
     total, guesses = candidate_passwords_from_alt_chars(
         guesses=["te57"],
