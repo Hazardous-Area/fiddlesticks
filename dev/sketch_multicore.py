@@ -9,6 +9,7 @@ from pathlib import Path
 from fiddlesticks import (
     MS_OfficeFilesKeyChecker,
     candidate_passwords_from_alt_chars,
+    handle_found_password_output,
     save_ruled_out_indices_to_progress_file,
 )
 
@@ -61,55 +62,12 @@ class Worker:
 
         if self.checker(guess):
             self.pw_found.set()
+            handle_found_password_output(guess, index, print_passwords=True)
+
             return False
 
         self.incorrect_guess_indices.put(index)
         return True
-
-
-def _make_worker_loop_body(
-    pw_found: EventT,
-    guesses: Queue[GuessInfo],
-    incorrect_guess_indices: Queue[int],
-    checker: Callable[[str], bool],
-):
-    def work():
-        if pw_found.is_set():
-            return False
-
-        try:
-            guess_info = guesses.get(timeout=10)
-        except queue.Empty:
-            return False
-
-        index, (guess, _num_subs) = guess_info
-
-        if checker(guess):
-            pw_found.set()
-            return False
-
-        incorrect_guess_indices.put(index)
-        return True
-
-    return work()
-
-
-def make_worker(
-    pw_found: EventT,
-    queued_guesses: Queue[GuessInfo],
-    incorrect_guess_indices: Queue[int],
-    checker: Callable[[str], bool],
-):
-
-    work = _make_worker_loop_body(
-        pw_found, queued_guesses, incorrect_guess_indices, checker
-    )
-
-    def worker():
-        while work():
-            pass
-
-    return worker
 
 
 def parent(
@@ -136,9 +94,7 @@ def parent(
         )
         for _ in range(num_cores - 1)
     ]
-    parent_work = _make_worker_loop_body(
-        pw_found, queued_guesses, incorrect_guess_indices, checker
-    )
+    parent_worker = Worker(pw_found, queued_guesses, incorrect_guess_indices, checker)
 
     unqueued_candidates = True
 
@@ -166,15 +122,17 @@ def parent(
 
         save_ruled_out_indices_to_progress_file(indices)
 
-        more_work = parent_work()
+        more_work = parent_worker()
         if not more_work:
             break
+
+    if pw_found.is_set():
+        print("Found password!")
 
 
 def main():
     xlsx_file = Path(__file__).parent.parent / "tests" / "data_files" / "test.xlsx"
-    # checker = make_MS_Office_files_key_checker(xlsx_file)
-    checker = MS_OfficeFilesKeyChecker(xlsx_file)
+    checker = MS_OfficeFilesKeyChecker(file=xlsx_file)
     first_index = 0
     total, guesses = candidate_passwords_from_alt_chars(
         guesses=["te57"],
