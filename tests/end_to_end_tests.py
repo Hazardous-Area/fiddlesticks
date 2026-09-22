@@ -150,14 +150,14 @@ def _run_fiddlesticks_without_extract_to(
     file: Path | None,
     _tmp_dir_path: str | Path,
     *args: str,
-    new_search: bool = True,
+    **kwargs: bool,
 ):
     other_args = list(args)
     if file is not None:
         other_args.append(str(file))
 
     return subprocess.run(
-        _collate_args(max_num_subs, guesses, *other_args, new_search=new_search),
+        _collate_args(max_num_subs, guesses, *other_args, **kwargs),
         capture_output=True,
         check=False,
         env={

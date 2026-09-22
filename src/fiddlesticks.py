@@ -46,7 +46,7 @@ TMP_DIR = (
 TMP_DIR.mkdir(exist_ok=True)
 DEFAULT_PROGRESS_FILE = TMP_DIR / "fiddlesticks_progress.json"
 IS_WINDOWS = sys.platform == "win32"
-
+type FileT = str | Path
 
 SHIFT_MAP: dict[str, str] = {
     "1": "!",
@@ -386,7 +386,7 @@ def handle_found_password(
     i: int,
     t: float | None = None,
     print_passwords: bool = False,
-    output_file: str = "",
+    output_file: FileT = "",
     **kwargs,
 ):
     msg = f"\nFound password (candidate index: {i})"
@@ -403,8 +403,8 @@ def handle_found_password(
 
 
 class Checker(AbstractContextManager):
-    def __init__(self, file: Path, **kwargs):
-        self.file = file
+    def __init__(self, *extras: str, **kwargs):
+        pass
 
     def __call__(self, candidate: str) -> bool:
         raise NotImplementedError
@@ -445,9 +445,9 @@ class Py7zrChecker(Checker):
 
 
 class SubprocessChecker(Checker):
-    def __init__(self, subprocess_args: list[str], **kwargs):
+    def __init__(self, *extras: str, **kwargs):
 
-        self.subprocess_args = subprocess_args
+        self.subprocess_args = list(extras)
 
         # If args[-1][-1] = " ", it will get escaped
         # and quoted together with the appended password.
@@ -481,14 +481,14 @@ def _make_new_tmp_sub_dir(tmp_dir, name: str = "extracted") -> Path:
     return p
 
 
-def _make_new_tmp_sub_dir_for_7z(file: str, tmp_dir: Path = TMP_DIR) -> Path:
+def _make_new_tmp_sub_dir_for_7z(file: FileT, tmp_dir: Path = TMP_DIR) -> Path:
     p = _make_new_tmp_sub_dir(tmp_dir)
     print_to_stderr(f"If {file} is unzipped successfully, contents will be in: {p}")
     return p
 
 
 class SevenZipChecker(SubprocessChecker):
-    def __init__(self, file: str, extract_to: str | None = None, **kwargs):
+    def __init__(self, file: FileT, extract_to: str | None = None, **kwargs):
 
         # Ensure we can run 7zip in a subprocess.
         subprocess.run(["7z", "--help"], capture_output=True, check=True)
@@ -501,13 +501,11 @@ class SevenZipChecker(SubprocessChecker):
         )
 
         super().__init__(
-            subprocess_args=[
-                "7z",
-                "x",
-                f"-o{self.extract_to}",
-                self.file,
-                "-p",
-            ],
+            "7z",
+            "x",
+            f"-o{self.extract_to}",
+            self.file,
+            "-p",
         )
 
 
@@ -532,7 +530,7 @@ class Persistent7zipChecker(Checker):
     done
     """
 
-    def __init__(self, file: str, extract_to: str | None = None, **kwargs):
+    def __init__(self, file: FileT, extract_to: str | None = None, **kwargs):
         self.extract_to = (
             str(_make_new_tmp_sub_dir_for_7z(file))
             if extract_to is None
@@ -541,7 +539,7 @@ class Persistent7zipChecker(Checker):
 
         cmd = textwrap.dedent(
             self.PERSISTENT_7Z_CHECKER_OUTLINE.format(
-                extract_to=self.extract_to, file=file
+                extract_to=self.extract_to, file=Path(file).as_posix()
             )
         )
 
@@ -572,7 +570,7 @@ class Persistent7zipChecker(Checker):
 
 
 class PyAvduAegisChecker(Checker):
-    def __init__(self, file: str, **kwargs):
+    def __init__(self, file: FileT, **kwargs):
         from py_avdu.encrypted_classes import VaultEncrypted
 
         vault_dict = json.loads(Path(file).read_text())
@@ -587,7 +585,7 @@ class PyAvduAegisChecker(Checker):
 
 
 class PyKeepassChecker(Checker):
-    def __init__(self, file: Path, **kwargs):
+    def __init__(self, file: FileT, **kwargs):
 
         from pykeepass import PyKeePass
         from pykeepass.exceptions import CredentialsError
@@ -620,7 +618,7 @@ class _SSHKeyCheckerBase(Checker):
     loader = None
     incorrect_password_msg = ""
 
-    def __init__(self, file: Path, **kwargs):
+    def __init__(self, file: FileT, **kwargs):
 
         if self.loader is None or not self.incorrect_password_msg:
             raise TypeError(
@@ -675,7 +673,7 @@ class _SSHKeyCheckerBase(Checker):
         return True
 
 
-def make_ssh_key_checker(file: Path, **kwargs):
+def make_ssh_key_checker(file: FileT, **kwargs):
 
     exceptions = []
 
@@ -698,7 +696,7 @@ def make_ssh_key_checker(file: Path, **kwargs):
 
 
 class OpenSSHKeyChecker(_SSHKeyCheckerBase):
-    def __init__(self, file: Path, **kwargs):
+    def __init__(self, file: FileT, **kwargs):
 
         from cryptography.hazmat.primitives.serialization import load_ssh_private_key
 
@@ -710,7 +708,7 @@ class OpenSSHKeyChecker(_SSHKeyCheckerBase):
 
 
 class SSHPEMKeyChecker(_SSHKeyCheckerBase):
-    def __init__(self, file: Path, **kwargs):
+    def __init__(self, file: FileT, **kwargs):
 
         from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
@@ -724,7 +722,7 @@ class SSHPEMKeyChecker(_SSHKeyCheckerBase):
 
 
 class MS_OfficeFilesKeyChecker(Checker):
-    def __init__(self, file: Path, **kwargs):
+    def __init__(self, file: FileT, **kwargs):
 
         import msoffcrypto
         from msoffcrypto.exceptions import InvalidKeyError
@@ -746,7 +744,7 @@ class MS_OfficeFilesKeyChecker(Checker):
 
 
 class VeracryptChecker(SubprocessChecker):
-    def __init__(self, file: Path, **kwargs):
+    def __init__(self, file: FileT, **kwargs):
 
         path = Path(file).resolve()
         assert path.is_file()
@@ -762,18 +760,16 @@ class VeracryptChecker(SubprocessChecker):
         ).resolve()
 
         super().__init__(
-            subprocess_args=[
-                "veracrypt",
-                "--text",
-                "--non-interactive",
-                "--keyfiles=",
-                "--pim=0",
-                "--protect-hidden=no",
-                "--mount",
-                path.as_posix(),
-                mount_point.as_posix(),
-                "--password=",
-            ]
+            "veracrypt",
+            "--text",
+            "--non-interactive",
+            "--keyfiles=",
+            "--pim=0",
+            "--protect-hidden=no",
+            "--mount",
+            path.as_posix(),
+            mount_point.as_posix(),
+            "--password=",
         )
 
     def close(self):

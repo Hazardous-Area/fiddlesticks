@@ -47,6 +47,7 @@ dev = [
 ]
 test = [
     "fiddlesticks[ssh,keepassxc,aegis,py7zr,msoffice]",
+    "psutil",
     "pytest",
     "hypothesis",
     "coverage>=7.13",
