@@ -7,14 +7,15 @@ import pytest
 
 from fiddlesticks import (
     IS_WINDOWS,
+    MS_OfficeFilesKeyChecker,
+    PyAvduAegisChecker,
+    PyKeepassChecker,
+    SubprocessChecker,
+    VeracryptChecker,
     _make_new_tmp_sub_dir,
+    _SSHKeyCheckerBase,
     check_passwords_sequentially,
-    make_MS_Office_files_key_checker,
-    make_py_avdu_aegis_checker,
-    make_pykeepass_checker,
     make_ssh_key_checker,
-    make_subprocess_checker,
-    make_Veracrypt_checker,
 )
 
 from .helpers import (
@@ -38,7 +39,7 @@ def test_is_7zip_installed():
 
 
 def test_aegis_checker_against_avdu_vault(avdu_test_vault):  # noqa: F811
-    checker = make_py_avdu_aegis_checker(avdu_test_vault)
+    checker = PyAvduAegisChecker(avdu_test_vault)
     # """
     # # Run using the encrypted test file. (Enter password "test" when prompted.)
     # go run ./cmd/avdu -p test/data/aegis_encrypted.json -e
@@ -49,7 +50,7 @@ def test_aegis_checker_against_avdu_vault(avdu_test_vault):  # noqa: F811
 
 
 def test_pykeepass_checker_against_Test_vault():
-    checker = make_pykeepass_checker(KDBX_TEST_VAULT)
+    checker = PyKeepassChecker(KDBX_TEST_VAULT)
     assert checker("test")
     assert not checker("wrong_password")
 
@@ -64,7 +65,7 @@ def test_make_new_tmp_sub_dir(tmp_path, capsys):
 @pytest.mark.skipif(
     IS_WINDOWS, reason="I haven't figured out the 7zip CLI on Windows yet"
 )
-def test_make_subprocess_checker(tmp_path):
+def test_SubprocessChecker(tmp_path):
     script = tmp_path / "extract_with_7z.sh"
     script.write_text(f"""\
 #!/usr/bin/env bash
@@ -73,7 +74,7 @@ set -eu
 7z x -p$1 -o{tmp_path} {SEVEN_ZIP_TEST_ARCHIVE}
 """)
     script.chmod(script.stat().st_mode | stat.S_IXUSR | stat.S_IRUSR)
-    checker = make_subprocess_checker(f"{script} ")
+    checker = SubprocessChecker(f"{script} ")
     assert checker("test")
 
 
@@ -137,7 +138,7 @@ def test_ssh_key_checker_bad_file(tmp_path):
 
 @pytest.mark.parametrize("path", [XLSX_FILE, DOCX_FILE])
 def test_ms_office_crypto_tool_checker(path: Path):
-    checker = make_MS_Office_files_key_checker(path)
+    checker = MS_OfficeFilesKeyChecker(path)
     assert not checker("not_test")
     assert checker("test")
 
@@ -151,9 +152,28 @@ def test_veracrypt_checker(tmp_path):
     # Default mount point ./mnt/veracrypt_volume{_X}
     _try_make_veracrypt_volume(volume, password)
 
-    checker = make_Veracrypt_checker(file=volume)
+    checker = VeracryptChecker(file=volume)
     assert not checker("not_test")
 
     # This can fail if the volume is already mounted, or
     # if something is already mounted to the same mount point.
     assert checker("test")
+
+
+def test_SSH_base_class_cannot_be_instantiated():
+
+    class SSHCheckerWithoutLoader(_SSHKeyCheckerBase):
+        incorrect_password_msg = "foo"
+
+    class SSHCheckerWithoutErrorMsg(_SSHKeyCheckerBase):
+        # Not a valid loader, but anything
+        # other than None will do for this test.
+        loader = object()
+
+    for Class in (
+        _SSHKeyCheckerBase,
+        SSHCheckerWithoutLoader,
+        SSHCheckerWithoutErrorMsg,
+    ):
+        with pytest.raises(TypeError):
+            Class(file="some_key_file.pem")

@@ -19,15 +19,13 @@
 # ]
 # ///
 
-__version__ = "0.5.0.dev"
+__version__ = "0.6.0.dev"
 
 import argparse
-import atexit
 import getpass
 import io
 import json
 import math
-import os
 import string
 import subprocess
 import sys
@@ -37,6 +35,7 @@ import time
 import warnings
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Sequence
+from contextlib import AbstractContextManager
 from itertools import combinations, cycle, islice, product
 from pathlib import Path
 from typing import cast
@@ -47,7 +46,7 @@ TMP_DIR = (
 TMP_DIR.mkdir(exist_ok=True)
 DEFAULT_PROGRESS_FILE = TMP_DIR / "fiddlesticks_progress.json"
 IS_WINDOWS = sys.platform == "win32"
-
+type FileT = str | Path
 
 SHIFT_MAP: dict[str, str] = {
     "1": "!",
@@ -382,12 +381,12 @@ def candidate_passwords_from_alt_chars(
     return total_num_candidates, candidates
 
 
-def handle_found_password_output(
+def handle_found_password(
     password: str,
     i: int,
     t: float | None = None,
     print_passwords: bool = False,
-    output_file: str = "",
+    output_file: FileT = "",
     **kwargs,
 ):
     msg = f"\nFound password (candidate index: {i})"
@@ -403,53 +402,73 @@ def handle_found_password_output(
             f.write(password)
 
 
-def make_py7zr_checker(archive: str, extract_to: str | None = None, **kwargs):
-    from _lzma import LZMAError
+class Checker(AbstractContextManager):
+    def __init__(self, *extras: str, **kwargs):
+        pass
 
-    import py7zr
-    from py7zr.exceptions import Bad7zFile, PasswordRequired
+    def __call__(self, candidate: str) -> bool:
+        raise NotImplementedError
 
-    if extract_to is None:
-        extract_to = str(_make_new_tmp_sub_dir_for_7z(archive))
-    stream = io.BytesIO(Path(archive).read_bytes())
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
 
-    def is_correct_password_for_7z_file(candidate: str) -> bool:
-        stream.seek(0)
+    def close(self):
+        pass
+
+
+class Py7zrChecker(Checker):
+    def __init__(self, archive: str, extract_to: str | None = None, **kwargs):
+        from _lzma import LZMAError
+
+        from py7zr import SevenZipFile
+        from py7zr.exceptions import Bad7zFile, PasswordRequired
+
+        self.SevenZipFile = SevenZipFile
+        self.exceptions = (PasswordRequired, Bad7zFile, LZMAError)
+
+        self.extract_to = (
+            str(_make_new_tmp_sub_dir_for_7z(archive))
+            if extract_to is None
+            else extract_to
+        )
+        self.stream = io.BytesIO(Path(archive).read_bytes())
+
+    def __call__(self, candidate: str) -> bool:
+        self.stream.seek(0)
         try:
-            f = py7zr.SevenZipFile(stream, "r", password=candidate)
-            f.extractall(path=extract_to)
-        except (PasswordRequired, Bad7zFile, LZMAError):
+            f = self.SevenZipFile(self.stream, "r", password=candidate)
+            f.extractall(path=self.extract_to)
+        except self.exceptions:
             return False
         f.close()
         return True
 
-    return is_correct_password_for_7z_file
 
+class SubprocessChecker(Checker):
+    def __init__(self, *extras: str, **kwargs):
 
-def make_subprocess_checker(*args: str, **kwargs):
+        self.subprocess_args = list(extras)
 
-    # If args[-1][-1] = " ", it will get escaped
-    # and quoted together with the appended password.
-    # Interpreting that space as a Bash word separator
-    # requires shell=True.
-    # On the other hand, if last == "-p", e.g. with 7z,
-    # the password is expected with no space separating it
-    # from the -p.
-    # Therefore to honour our contract of "any partial
-    # Bash command to which a password guess can be appended"
-    # it's easiest to use a single string (instead of an args list),
-    # and (unless on Windows) shell=True.
+        # If args[-1][-1] = " ", it will get escaped
+        # and quoted together with the appended password.
+        # Interpreting that space as a Bash word separator
+        # requires shell=True.
+        # On the other hand, if last == "-p", e.g. with 7z,
+        # the password is expected with no space separating it
+        # from the -p.
+        # Therefore to honour our contract of "any partial
+        # Bash command to which a password guess can be appended"
+        # it's easiest to use a single string (instead of an args list),
+        # and (unless on Windows) shell=True.
 
-    def checker(candidate: str) -> bool:
+    def __call__(self, candidate: str) -> bool:
         result = subprocess.run(
-            f"{' '.join(args)}{candidate}",
+            f"{' '.join(self.subprocess_args)}{candidate}",
             capture_output=True,
             check=False,
             shell=not IS_WINDOWS,
         )
         return result.returncode == 0
-
-    return checker
 
 
 def _make_new_tmp_sub_dir(tmp_dir, name: str = "extracted") -> Path:
@@ -462,151 +481,181 @@ def _make_new_tmp_sub_dir(tmp_dir, name: str = "extracted") -> Path:
     return p
 
 
-def _make_new_tmp_sub_dir_for_7z(file: str, tmp_dir: Path = TMP_DIR) -> Path:
+def _make_new_tmp_sub_dir_for_7z(file: FileT, tmp_dir: Path = TMP_DIR) -> Path:
     p = _make_new_tmp_sub_dir(tmp_dir)
     print_to_stderr(f"If {file} is unzipped successfully, contents will be in: {p}")
     return p
 
 
-def make_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
+class SevenZipChecker(SubprocessChecker):
+    def __init__(self, file: FileT, extract_to: str | None = None, **kwargs):
 
-    # Ensure we can run 7zip in a subprocess.
-    subprocess.run(["7z", "--help"], capture_output=True, check=True)
+        # Ensure we can run 7zip in a subprocess.
+        subprocess.run(["7z", "--help"], capture_output=True, check=True)
 
-    if extract_to is None:
-        extract_to = str(_make_new_tmp_sub_dir_for_7z(file))
+        self.file = str(file)
+        self.extract_to = (
+            str(_make_new_tmp_sub_dir_for_7z(file))
+            if extract_to is None
+            else extract_to
+        )
 
-    return make_subprocess_checker("7z", "x", f"-o{extract_to}", file, "-p")
+        super().__init__(
+            "7z",
+            "x",
+            f"-o{self.extract_to}",
+            self.file,
+            "-p",
+        )
 
 
-def make_password_candidate_piper(*args, **kwargs):
-    def piper(password: str):
-        print(password, file=sys.stdout)
+class PasswordCandidatePiper(Checker):
+    def __call__(self, candidate: str) -> bool:
+        print(candidate, file=sys.stdout)
         return False
 
-    return piper
 
+class Persistent7zipChecker(Checker):
+    PERSISTENT_7Z_CHECKER_OUTLINE = """\
+    #!/usr/bin/env bash
 
-PERSISTENT_7Z_CHECKER_OUTLINE = """\
-#!/usr/bin/env bash
+    while read -r line; do
+        # Silently run command, only check exit code
+        7z x -o{extract_to} {file} -p"$line" > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            echo "Success! :)"
+            break
+        fi
+        echo "Nope :("
+    done
+    """
 
-while read -r line; do
-    # Silently run command, only check exit code
-    7z x -o{extract_to} {file} -p"$line" > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        echo "Success! :)"
-        break
-    fi
-    echo "Nope :("
-done
-"""
+    def __init__(self, file: FileT, extract_to: str | None = None, **kwargs):
+        self.extract_to = (
+            str(_make_new_tmp_sub_dir_for_7z(file))
+            if extract_to is None
+            else extract_to
+        )
 
+        cmd = textwrap.dedent(
+            self.PERSISTENT_7Z_CHECKER_OUTLINE.format(
+                extract_to=self.extract_to, file=Path(file).as_posix()
+            )
+        )
 
-def make_persistent_7zip_checker(file: str, extract_to: str | None = None, **kwargs):
-    if extract_to is None:
-        extract_to = str(_make_new_tmp_sub_dir_for_7z(file))
+        # Launch a single persistent Bash process reading from stdin line-by-line
+        self.proc = subprocess.Popen(
+            ["bash", "-c", cmd],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+            bufsize=1,  # Line buffered
+        )
 
-    cmd = textwrap.dedent(
-        PERSISTENT_7Z_CHECKER_OUTLINE.format(extract_to=extract_to, file=file)
-    )
+        self.stdin = cast(io.TextIOBase, self.proc.stdin)
+        self.stdout = cast(io.TextIOBase, self.proc.stdout)
 
-    # Launch a single persistent Bash process reading from stdin line-by-line
-    proc = subprocess.Popen(
-        ["bash", "-c", cmd],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        text=True,
-        bufsize=1,  # Line buffered
-    )
-
-    stdin = cast(io.TextIOBase, proc.stdin)
-    stdout = cast(io.TextIOBase, proc.stdout)
-
-    def checker(candidate: str) -> bool:
+    def __call__(self, candidate: str) -> bool:
         # Send data down the pipe
-        stdin.write(f"{candidate}\n")
-        stdin.flush()
+        self.stdin.write(f"{candidate}\n")
+        self.stdin.flush()
 
         # Read the response back
-        response = stdout.readline().strip()
+        response = self.stdout.readline().strip()
         return "Success" in response
 
-    @atexit.register
-    def cleanup():
-        stdin.close()
-        proc.wait()
-
-    return checker
+    def close(self):
+        self.stdin.close()
+        self.proc.wait()
 
 
-def make_py_avdu_aegis_checker(file: str, **kwargs):
+class PyAvduAegisChecker(Checker):
+    def __init__(self, file: FileT, **kwargs):
+        from py_avdu.encrypted_classes import VaultEncrypted
 
-    from py_avdu.encrypted_classes import VaultEncrypted
+        vault_dict = json.loads(Path(file).read_text())
+        self.encrypted = VaultEncrypted(**vault_dict)
 
-    vault_dict = json.loads(Path(file).read_text())
-
-    encrypted = VaultEncrypted(**vault_dict)
-
-    def checker(candidate: str) -> bool:
+    def __call__(self, candidate: str) -> bool:
         try:
-            encrypted.find_master_key(candidate)
+            self.encrypted.find_master_key(candidate)
             return True
         except ValueError:
             return False
 
-    return checker
 
+class PyKeepassChecker(Checker):
+    def __init__(self, file: FileT, **kwargs):
 
-def make_pykeepass_checker(file: os.PathLike, **kwargs):
+        from pykeepass import PyKeePass
+        from pykeepass.exceptions import CredentialsError
 
-    from pykeepass import PyKeePass
-    from pykeepass.exceptions import CredentialsError
+        self.PyKeePass = PyKeePass
+        self.CredentialsError = CredentialsError
+        self.stream = io.BytesIO(Path(file).read_bytes())
 
-    def checker(candidate: str) -> bool:
+    def __call__(self, candidate: str) -> bool:
+        self.stream.seek(0)
         try:
-            PyKeePass(file, password=candidate)
+            self.PyKeePass(self.stream, password=candidate)
             return True
-        except CredentialsError:
+        except self.CredentialsError:
             return False
-
-    return checker
 
 
 def _get_hopefully_incorrect_password() -> str:
+    """Deliberately chosen bad passwords that should never be chosen
+    by real users.  Used internally to validate
+    SSHKeyCheckerBase.incorrect_pasword_msg in subclasses.
+    """
     try:
         return getpass.getuser()
     except OSError:
         return "password123"
 
 
-def _try_make_ssh_key_checker_from_loader(
-    loader,
-    incorrect_password_msg: str,
-    file: os.PathLike,
-    **kwargs,
-) -> Callable[[str], bool]:
+class _SSHKeyCheckerBase(Checker):
+    loader = None
+    incorrect_password_msg = ""
 
-    private_key_data = Path(file).read_bytes()
-    hopefully_incorrect_password = _get_hopefully_incorrect_password()
-    try:
-        loader(private_key_data, password=hopefully_incorrect_password.encode())
-    except ValueError as e:
-        if e.args[0] != incorrect_password_msg:
-            raise
-    else:
-        handle_found_password_output(
-            hopefully_incorrect_password,
-            i=-12345,
-            t=None,
-            **kwargs,
-        )
-        sys.exit(0)
+    def __init__(self, file: FileT, **kwargs):
 
-    def checker(candidate: str) -> bool:
+        if self.loader is None or not self.incorrect_password_msg:
+            raise TypeError(
+                "loader and incorrect_password_msg attributes must be defined, "
+                "e.g. on a subclass of _SSHKeyCheckerBase "
+            )
+
+        self.private_key_data = Path(file).read_bytes()
+        hopefully_incorrect_password = _get_hopefully_incorrect_password()
+
+        # Ensure that incorrect_password_msg really is the
+        # string in the error messages for the file type of file,
+        # (e.g. the different key file formats from openssl and ssh-keygen).
         try:
-            loader(
-                private_key_data,
+            self.loader(
+                self.private_key_data, password=hopefully_incorrect_password.encode()
+            )
+        except ValueError as e:
+            if e.args[0] != self.incorrect_password_msg:
+                raise
+        else:
+            handle_found_password(
+                hopefully_incorrect_password,
+                i=-12345,
+                t=None,
+                **kwargs,
+            )
+            sys.exit(0)
+
+    def __call__(self, candidate: str) -> bool:
+        try:
+            self.loader(  # type: ignore
+                self.private_key_data,
                 password=candidate.encode(),
+                # TODO: Does cryptography still do key pair vaidation if the
+                # password is incorrect?  Or something else to thwart timing attacks?
+                #
                 # Fail fast.  Key pair validation is out of scope
                 # (but on success we do it anyway to give the user a heads up).
                 # https://cryptography.io/en/latest/hazmat/primitives/asymmetric/serialization/#cryptography.hazmat.primitives.serialization.load_ssh_private_key
@@ -614,8 +663,8 @@ def _try_make_ssh_key_checker_from_loader(
             )
         except ValueError:
             return False
-        loader(
-            private_key_data,
+        self.loader(  # type: ignore
+            self.private_key_data,
             password=candidate.encode(),
             # Validate key pair, only once we already know
             # we have the correct password.
@@ -623,16 +672,14 @@ def _try_make_ssh_key_checker_from_loader(
         )
         return True
 
-    return checker
 
-
-def make_ssh_key_checker(file: os.PathLike, **kwargs):
+def make_ssh_key_checker(file: FileT, **kwargs):
 
     exceptions = []
 
     for factory in [
-        make_openSSH_key_checker,
-        make_ssh_pem_key_checker,
+        OpenSSHKeyChecker,
+        SSHPEMKeyChecker,
     ]:
         try:
             return factory(file, **kwargs)
@@ -648,84 +695,86 @@ def make_ssh_key_checker(file: os.PathLike, **kwargs):
     )
 
 
-def make_openSSH_key_checker(file: os.PathLike, **kwargs):
-    from cryptography.hazmat.primitives.serialization import load_ssh_private_key
+class OpenSSHKeyChecker(_SSHKeyCheckerBase):
+    def __init__(self, file: FileT, **kwargs):
 
-    return _try_make_ssh_key_checker_from_loader(
-        load_ssh_private_key,
-        "Corrupt data: broken checksum",  # Defined in cryptography's ssh.py, since 2020
-        file,
-        **kwargs,
-    )
+        from cryptography.hazmat.primitives.serialization import load_ssh_private_key
+
+        self.loader = load_ssh_private_key
+
+        # Defined in cryptography's ssh.py, since 2020
+        self.incorrect_password_msg = "Corrupt data: broken checksum"
+        super().__init__(file=file, **kwargs)
 
 
-def make_ssh_pem_key_checker(file: os.PathLike, **kwargs):
-    from cryptography.hazmat.primitives.serialization import load_pem_private_key
+class SSHPEMKeyChecker(_SSHKeyCheckerBase):
+    def __init__(self, file: FileT, **kwargs):
 
-    return _try_make_ssh_key_checker_from_loader(
-        load_pem_private_key,
-        "Incorrect password, could not decrypt key",  # Defined in cryptography's Rust extension since Apr 2025
+        from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+        self.loader = load_pem_private_key
+
+        # Defined in cryptography's Rust extension since Apr 2025
+        self.incorrect_password_msg = "Incorrect password, could not decrypt key"
         # TODO: Investigate the other error strings that have been seen.  See misc_tests.py
-        file,
-        **kwargs,
-    )
+
+        super().__init__(file=file, **kwargs)
 
 
-def make_MS_Office_files_key_checker(file: os.PathLike, **kwargs):
+class MS_OfficeFilesKeyChecker(Checker):
+    def __init__(self, file: FileT, **kwargs):
 
-    import msoffcrypto
-    import msoffcrypto.exceptions
+        import msoffcrypto
+        from msoffcrypto.exceptions import InvalidKeyError
 
-    encrypted = io.BytesIO(Path(file).read_bytes())
-    office_file = msoffcrypto.OfficeFile(encrypted)
+        self.InvalidKeyError = InvalidKeyError
 
-    stream = io.BytesIO()
+        encrypted = io.BytesIO(Path(file).read_bytes())
+        self._office_file = msoffcrypto.OfficeFile(encrypted)
 
-    def checker(candidate: str) -> bool:
-        office_file.load_key(password=candidate)
+        self._stream = io.BytesIO()
+
+    def __call__(self, candidate: str) -> bool:
+        self._office_file.load_key(password=candidate)
         try:
-            office_file.decrypt(stream)
+            self._office_file.decrypt(self._stream)
             return True
-        except msoffcrypto.exceptions.InvalidKeyError:
+        except self.InvalidKeyError:
             return False
 
-    return checker
 
+class VeracryptChecker(SubprocessChecker):
+    def __init__(self, file: FileT, **kwargs):
 
-def make_Veracrypt_checker(file: os.PathLike, **kwargs):
+        path = Path(file).resolve()
+        assert path.is_file()
 
-    path = Path(file).resolve()
-    assert path.is_file()
+        # Ensure we can run Veracrypt in a subprocess.
+        subprocess.run(["veracrypt", "--help"], capture_output=True, check=True)
 
-    # Ensure we can run Veracrypt in a subprocess.
-    subprocess.run(["veracrypt", "--help"], capture_output=True, check=True)
+        self.temp_dir = tempfile.TemporaryDirectory(delete=False)
 
-    temp_dir = tempfile.TemporaryDirectory(delete=False)
+        mount_point = _make_new_tmp_sub_dir(
+            tmp_dir=Path(self.temp_dir.name) / "mnt",
+            name="veracrypt_volume",
+        ).resolve()
 
-    mount_point = _make_new_tmp_sub_dir(
-        tmp_dir=Path(temp_dir.name) / "mnt",
-        name="veracrypt_volume",
-    ).resolve()
+        super().__init__(
+            "veracrypt",
+            "--text",
+            "--non-interactive",
+            "--keyfiles=",
+            "--pim=0",
+            "--protect-hidden=no",
+            "--mount",
+            path.as_posix(),
+            mount_point.as_posix(),
+            "--password=",
+        )
 
-    args = [
-        "veracrypt",
-        "--text",
-        "--non-interactive",
-        "--keyfiles=",
-        "--pim=0",
-        "--protect-hidden=no",
-        "--mount",
-        path.as_posix(),
-        mount_point.as_posix(),
-        "--password=",
-    ]
-
-    @atexit.register
-    def cleanup():
+    def close(self):
         subprocess.run(["veracrypt", "--unmount"], capture_output=True, check=True)
-        temp_dir.cleanup()
-
-    return make_subprocess_checker(*args)
+        self.temp_dir.cleanup()
 
 
 def save_ruled_out_indices_to_progress_file(
@@ -840,17 +889,17 @@ def check_passwords_sequentially(
 
 
 default_password_protected_file_checker_factories = {
-    ".7z": make_7zip_checker,
-    ".json": make_py_avdu_aegis_checker,
-    ".kdbx": make_pykeepass_checker,
-    ".kdb": make_pykeepass_checker,
+    ".7z": SevenZipChecker,
+    ".json": PyAvduAegisChecker,
+    ".kdbx": PyKeepassChecker,
+    ".kdb": PyKeepassChecker,
     ".pem": make_ssh_key_checker,  # could make this the legacy PEM one?
     ".key": make_ssh_key_checker,
     ".priv": make_ssh_key_checker,
-    ".docx": make_MS_Office_files_key_checker,
-    ".xlsx": make_MS_Office_files_key_checker,
-    ".hc": make_Veracrypt_checker,
-    ".tc": make_Veracrypt_checker,
+    ".docx": MS_OfficeFilesKeyChecker,
+    ".xlsx": MS_OfficeFilesKeyChecker,
+    ".hc": VeracryptChecker,
+    ".tc": VeracryptChecker,
 }
 
 
@@ -865,7 +914,7 @@ def _default_factory_selector(*args: str):
     if len(args) == 1 and path.is_file():
         return default_password_protected_file_checker_factories[path.suffix.lower()]
 
-    return make_subprocess_checker
+    return SubprocessChecker
 
 
 parser = argparse.ArgumentParser(prog="fiddlesticks")
@@ -1017,12 +1066,12 @@ def add_command_arg(name, command, help: str | None = None):
     )
 
 
-add_command_arg("--shell", make_subprocess_checker)
-add_command_arg("--7zip", make_7zip_checker)
-add_command_arg("--7zip-persistent", make_persistent_7zip_checker)
+add_command_arg("--shell", SubprocessChecker)
+add_command_arg("--7zip", SevenZipChecker)
+add_command_arg("--7zip-persistent", Persistent7zipChecker)
 add_command_arg(
     "--pipe",
-    make_password_candidate_piper,
+    PasswordCandidatePiper,
     help=(
         "Print all password candidates to stdout, "
         "e.g. to pipe them to an external password checking program. "
@@ -1032,13 +1081,13 @@ add_command_arg(
 add_command_arg("--print-char-map", "print-char-map")
 # Optional commands requiring extra deps
 add_command_arg("--ssh", make_ssh_key_checker)
-add_command_arg("--openssh", make_openSSH_key_checker)
-add_command_arg("--ssh-pem", make_ssh_pem_key_checker)
-add_command_arg("--keypassxc", make_pykeepass_checker)
-add_command_arg("--aegis", make_py_avdu_aegis_checker)
-add_command_arg("--py7zr", make_py7zr_checker)
-add_command_arg("--msoffice", make_MS_Office_files_key_checker)
-add_command_arg("--veracrypt", make_Veracrypt_checker)
+add_command_arg("--openssh", OpenSSHKeyChecker)
+add_command_arg("--ssh-pem", SSHPEMKeyChecker)
+add_command_arg("--keypassxc", PyKeepassChecker)
+add_command_arg("--aegis", PyAvduAegisChecker)
+add_command_arg("--py7zr", Py7zrChecker)
+add_command_arg("--msoffice", MS_OfficeFilesKeyChecker)
+add_command_arg("--veracrypt", VeracryptChecker)
 
 
 alt_char_map_group = add_mutex_group(
@@ -1137,10 +1186,10 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
     if (
         command
         not in (
-            make_7zip_checker,
-            make_persistent_7zip_checker,
-            make_subprocess_checker,
-            make_password_candidate_piper,
+            SevenZipChecker,
+            Persistent7zipChecker,
+            SubprocessChecker,
+            PasswordCandidatePiper,
         )
         and not ns.print_passwords
         and not ns.output_file
@@ -1160,16 +1209,18 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         max_subs=ns.max_subs,
         alt_char_map=alt_char_map,
     )
-    checker = command(*extras, **kwargs)
 
     t0 = time.time()
 
-    result = check_passwords_sequentially(candidates, checker, total=total, **kwargs)
+    with command(*extras, **kwargs) as checker:
+        result = check_passwords_sequentially(
+            candidates, checker, total=total, **kwargs
+        )
 
     t1 = time.time()
 
     if result is None:
-        if ns.command is make_password_candidate_piper:
+        if ns.command is PasswordCandidatePiper:
             return 0
 
         print_to_stderr(
@@ -1181,7 +1232,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
 
     password, i = result
 
-    handle_found_password_output(password, i, t1 - t0, **kwargs)
+    handle_found_password(password, i, t1 - t0, **kwargs)
 
     return 0
 

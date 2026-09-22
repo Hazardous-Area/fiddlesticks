@@ -150,14 +150,14 @@ def _run_fiddlesticks_without_extract_to(
     file: Path | None,
     _tmp_dir_path: str | Path,
     *args: str,
-    new_search: bool = True,
+    **kwargs: bool,
 ):
     other_args = list(args)
     if file is not None:
         other_args.append(str(file))
 
     return subprocess.run(
-        _collate_args(max_num_subs, guesses, *other_args, new_search=new_search),
+        _collate_args(max_num_subs, guesses, *other_args, **kwargs),
         capture_output=True,
         check=False,
         env={
@@ -409,7 +409,7 @@ def shell_collater(num_subs: int, test_extracted_dir: Path, guess: str, file: st
         [guess],
         "--shell",
         "--",  # Tell argparse all subsequent args are positional
-        "7z",  # Taken from make_7zip_checker
+        "7z",  # Taken from SevenZipChecker
         "x",
         f"-o{test_extracted_dir}",
         file,
@@ -422,9 +422,11 @@ def pipe_to_bash_while_loop_collater(
     num_subs: int, test_extracted_dir: Path, guess: str, file: str
 ):
 
-    script_text = fiddlesticks.PERSISTENT_7Z_CHECKER_OUTLINE.format(
-        extract_to=str(test_extracted_dir),
-        file=file,
+    script_text = (
+        fiddlesticks.Persistent7zipChecker.PERSISTENT_7Z_CHECKER_OUTLINE.format(
+            extract_to=str(test_extracted_dir),
+            file=file,
+        )
     )
     script = Path("persistent_checker.sh")
     script.write_text(script_text)
