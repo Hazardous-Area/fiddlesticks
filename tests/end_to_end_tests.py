@@ -12,7 +12,7 @@ import pytest
 from hypothesis import HealthCheck, Phase, given, settings
 
 import fiddlesticks
-from fiddlesticks import IS_WINDOWS, IS_CMD_EXE
+from fiddlesticks import IS_WINDOWS
 
 from .helpers import (
     BI_MAP,
@@ -30,6 +30,7 @@ from .helpers import (
     guesses_and_num_subs_from_password,
     passwords_guesses_and_num_subs,
 )
+
 
 def test_CLI_with_no_args():
     result = subprocess.run(["fiddlesticks"], capture_output=True, check=False)
@@ -349,7 +350,9 @@ def test_update_every_verbosity_2_and_print_password(tmp_path):
 @pytest.mark.skipif(IS_WINDOWS, reason="Echo works differently in cmd")
 def test_default_with_a_shell_command(tmp_path):
     guesses = ["A"]
-    result = _run_fiddlesticks_without_extract_to(0, guesses, None, tmp_path, "echo ", shell=True)
+    result = _run_fiddlesticks_without_extract_to(
+        0, guesses, None, tmp_path, "echo ", shell=True
+    )
     assert result.returncode == 0
 
 
