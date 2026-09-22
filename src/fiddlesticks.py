@@ -19,7 +19,7 @@
 # ]
 # ///
 
-__version__ = "0.5.0.dev"
+__version__ = "0.6.0.dev"
 
 import argparse
 import getpass
@@ -402,7 +402,21 @@ def handle_found_password(
             f.write(password)
 
 
-class Py7zrChecker(AbstractContextManager):
+class Checker(AbstractContextManager):
+    def __init__(self, file: Path, **kwargs):
+        self.file = file
+
+    def __call__(self, candidate: str) -> bool:
+        raise NotImplementedError
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+    def close(self):
+        pass
+
+
+class Py7zrChecker(Checker):
     def __init__(self, archive: str, extract_to: str | None = None, **kwargs):
         from _lzma import LZMAError
 
@@ -430,7 +444,7 @@ class Py7zrChecker(AbstractContextManager):
         return True
 
 
-class SubprocessChecker(AbstractContextManager):
+class SubprocessChecker(Checker):
     def __init__(self, subprocess_args: list[str], **kwargs):
 
         self.subprocess_args = subprocess_args
@@ -497,13 +511,13 @@ class SevenZipChecker(SubprocessChecker):
         )
 
 
-class PasswordCandidatePiper(AbstractContextManager):
-    def __call__(self, password: str) -> bool:
-        print(password, file=sys.stdout)
+class PasswordCandidatePiper(Checker):
+    def __call__(self, candidate: str) -> bool:
+        print(candidate, file=sys.stdout)
         return False
 
 
-class Persistent7zipChecker(AbstractContextManager):
+class Persistent7zipChecker(Checker):
     PERSISTENT_7Z_CHECKER_OUTLINE = """\
     #!/usr/bin/env bash
 
@@ -552,12 +566,12 @@ class Persistent7zipChecker(AbstractContextManager):
         response = self.stdout.readline().strip()
         return "Success" in response
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def close(self):
         self.stdin.close()
         self.proc.wait()
 
 
-class PyAvduAegisChecker(AbstractContextManager):
+class PyAvduAegisChecker(Checker):
     def __init__(self, file: str, **kwargs):
         from py_avdu.encrypted_classes import VaultEncrypted
 
@@ -572,7 +586,7 @@ class PyAvduAegisChecker(AbstractContextManager):
             return False
 
 
-class PyKeepassChecker(AbstractContextManager):
+class PyKeepassChecker(Checker):
     def __init__(self, file: Path, **kwargs):
 
         from pykeepass import PyKeePass
@@ -602,7 +616,7 @@ def _get_hopefully_incorrect_password() -> str:
         return "password123"
 
 
-class _SSHKeyCheckerBase(AbstractContextManager):
+class _SSHKeyCheckerBase(Checker):
     loader = None
     incorrect_password_msg = ""
 
@@ -709,7 +723,7 @@ class SSHPEMKeyChecker(_SSHKeyCheckerBase):
         super().__init__(file=file, **kwargs)
 
 
-class MS_OfficeFilesKeyChecker(AbstractContextManager):
+class MS_OfficeFilesKeyChecker(Checker):
     def __init__(self, file: Path, **kwargs):
 
         import msoffcrypto
@@ -1199,11 +1213,13 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         max_subs=ns.max_subs,
         alt_char_map=alt_char_map,
     )
-    checker = command(*extras, **kwargs)
 
     t0 = time.time()
 
-    result = check_passwords_sequentially(candidates, checker, total=total, **kwargs)
+    with command(*extras, **kwargs) as checker:
+        result = check_passwords_sequentially(
+            candidates, checker, total=total, **kwargs
+        )
 
     t1 = time.time()
 

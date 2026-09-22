@@ -1,12 +1,13 @@
 import os
 import queue
 import sys
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from multiprocessing import Event, Process, Queue
 from multiprocessing.synchronize import Event as EventT
 from pathlib import Path
 
 from fiddlesticks import (
+    Checker,
     MS_OfficeFilesKeyChecker,
     candidate_passwords_from_alt_chars,
     handle_found_password,
@@ -37,16 +38,18 @@ class Worker:
         pw_found: EventT,
         guesses: Queue[GuessInfo],
         incorrect_guess_indices: Queue[int],
-        checker: Callable[[str], bool],
+        checker_factory: type[Checker],
+        file: Path,
     ):
         self.pw_found = pw_found
         self.guesses = guesses
         self.incorrect_guess_indices = incorrect_guess_indices
-        self.checker = checker
+        self.checker = checker_factory(file=file)
 
     def __call__(self):
-        while self.get_and_check_next_guess():
-            pass
+        with self.checker:
+            while self.get_and_check_next_guess():
+                pass
 
     def get_and_check_next_guess(self) -> bool:
 
@@ -71,7 +74,8 @@ class Worker:
 
 
 def parent(
-    checker: Callable[[str], bool],
+    checker_factory: type[Checker],
+    file: Path,
     guesses: Iterable[GuessInfo],
     num_cores: int | None = None,
     min_queue_size=1_000,
@@ -89,42 +93,47 @@ def parent(
 
     workers = [
         Process(
-            target=Worker(pw_found, queued_guesses, incorrect_guess_indices, checker),
+            target=Worker(
+                pw_found, queued_guesses, incorrect_guess_indices, checker_factory, file
+            ),
             args=(),
         )
         for _ in range(num_cores - 1)
     ]
-    parent_worker = Worker(pw_found, queued_guesses, incorrect_guess_indices, checker)
+    parent_worker = Worker(
+        pw_found, queued_guesses, incorrect_guess_indices, checker_factory, file
+    )
 
     unqueued_candidates = True
 
     for worker in workers:
         worker.start()
 
-    while not pw_found.is_set():
-        approx_queue_size = queued_guesses.qsize()
-        if unqueued_candidates and approx_queue_size <= min_queue_size:
-            # Or while workers not timed out
-            guess_info = next(guesses, None)
-            if guess_info is None:
-                unqueued_candidates = False
-            else:
-                queued_guesses.put(guess_info)
-                continue
+    with parent_worker.checker:
+        while not pw_found.is_set():
+            approx_queue_size = queued_guesses.qsize()
+            if unqueued_candidates and approx_queue_size <= min_queue_size:
+                # Or while workers not timed out
+                guess_info = next(guesses, None)
+                if guess_info is None:
+                    unqueued_candidates = False
+                else:
+                    queued_guesses.put(guess_info)
+                    continue
 
-        indices: list[int] = []
-        while True:
-            try:
-                index = incorrect_guess_indices.get_nowait()
-            except queue.Empty:
+            indices: list[int] = []
+            while True:
+                try:
+                    index = incorrect_guess_indices.get_nowait()
+                except queue.Empty:
+                    break
+                indices.append(index)
+
+            save_ruled_out_indices_to_progress_file(indices)
+
+            more_work = parent_worker.get_and_check_next_guess()
+            if not more_work:
                 break
-            indices.append(index)
-
-        save_ruled_out_indices_to_progress_file(indices)
-
-        more_work = parent_worker()
-        if not more_work:
-            break
 
     if pw_found.is_set():
         print("Found password!")
@@ -132,7 +141,6 @@ def parent(
 
 def main():
     xlsx_file = Path(__file__).parent.parent / "tests" / "data_files" / "test.xlsx"
-    checker = MS_OfficeFilesKeyChecker(file=xlsx_file)
     first_index = 0
     total, guesses = candidate_passwords_from_alt_chars(
         guesses=["te57"],
@@ -141,7 +149,8 @@ def main():
     print(f"{total=}")
 
     parent(
-        checker=checker,
+        checker_factory=MS_OfficeFilesKeyChecker,
+        file=xlsx_file,
         guesses=enumerate(guesses, start=first_index),
     )
 
