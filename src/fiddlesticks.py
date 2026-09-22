@@ -403,7 +403,7 @@ def handle_found_password(
 
 
 class Checker(AbstractContextManager):
-    def __init__(self, *extras, **kwargs):
+    def __init__(self, *extras: str, **kwargs):
         pass
 
     def __call__(self, candidate: str) -> bool:
@@ -445,9 +445,9 @@ class Py7zrChecker(Checker):
 
 
 class SubprocessChecker(Checker):
-    def __init__(self, subprocess_args: list[str], **kwargs):
+    def __init__(self, *extras: str, **kwargs):
 
-        self.subprocess_args = subprocess_args
+        self.subprocess_args = list(extras)
 
         # If args[-1][-1] = " ", it will get escaped
         # and quoted together with the appended password.
@@ -501,13 +501,11 @@ class SevenZipChecker(SubprocessChecker):
         )
 
         super().__init__(
-            subprocess_args=[
-                "7z",
-                "x",
-                f"-o{self.extract_to}",
-                self.file,
-                "-p",
-            ],
+            "7z",
+            "x",
+            f"-o{self.extract_to}",
+            self.file,
+            "-p",
         )
 
 
@@ -762,18 +760,16 @@ class VeracryptChecker(SubprocessChecker):
         ).resolve()
 
         super().__init__(
-            subprocess_args=[
-                "veracrypt",
-                "--text",
-                "--non-interactive",
-                "--keyfiles=",
-                "--pim=0",
-                "--protect-hidden=no",
-                "--mount",
-                path.as_posix(),
-                mount_point.as_posix(),
-                "--password=",
-            ]
+            "veracrypt",
+            "--text",
+            "--non-interactive",
+            "--keyfiles=",
+            "--pim=0",
+            "--protect-hidden=no",
+            "--mount",
+            path.as_posix(),
+            mount_point.as_posix(),
+            "--password=",
         )
 
     def close(self):

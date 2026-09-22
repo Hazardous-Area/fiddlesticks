@@ -73,7 +73,7 @@ set -eu
 7z x -p$1 -o{tmp_path} {SEVEN_ZIP_TEST_ARCHIVE}
 """)
     script.chmod(script.stat().st_mode | stat.S_IXUSR | stat.S_IRUSR)
-    checker = SubprocessChecker(subprocess_args=[f"{script} "])
+    checker = SubprocessChecker(f"{script} ")
     assert checker("test")
 
 
