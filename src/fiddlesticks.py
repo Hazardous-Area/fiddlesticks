@@ -776,7 +776,7 @@ class VeracryptChecker(SubprocessChecker):
             ]
         )
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def close(self):
         subprocess.run(["veracrypt", "--unmount"], capture_output=True, check=True)
         self.temp_dir.cleanup()
 
