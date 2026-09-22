@@ -351,7 +351,7 @@ def test_update_every_verbosity_2_and_print_password(tmp_path):
 def test_default_with_a_shell_command(tmp_path):
     guesses = ["A"]
     result = _run_fiddlesticks_without_extract_to(
-        0, guesses, None, tmp_path, "echo ", shell=True
+        0, guesses, None, tmp_path, "cat "
     )
     assert result.returncode == 0
 
