@@ -9,7 +9,7 @@ from pathlib import Path
 from fiddlesticks import (
     MS_OfficeFilesKeyChecker,
     candidate_passwords_from_alt_chars,
-    handle_found_password_output,
+    handle_found_password,
     save_ruled_out_indices_to_progress_file,
 )
 
@@ -62,7 +62,7 @@ class Worker:
 
         if self.checker(guess):
             self.pw_found.set()
-            handle_found_password_output(guess, index, print_passwords=True)
+            handle_found_password(guess, index, print_passwords=True)
 
             return False
 

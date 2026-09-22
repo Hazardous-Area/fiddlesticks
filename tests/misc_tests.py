@@ -20,7 +20,7 @@ from fiddlesticks import (
     IS_WINDOWS,
     _get_hopefully_incorrect_password,
     cli,
-    handle_found_password_output,
+    handle_found_password,
     offer_to_skip_indices_ruled_out_by_progress_file,
     save_ruled_out_indices_to_progress_file,
 )
@@ -55,7 +55,7 @@ def test_get_hopefully_incorrect_password_username_not_found(capsys):
     "print_passwords",
     [True, False],
 )
-def test_handle_found_password_output_no_time(
+def test_handle_found_password_no_time(
     print_passwords: bool,
     capsys,
 ):
@@ -64,7 +64,7 @@ def test_handle_found_password_output_no_time(
     # This currently only gets called without a calculation time
     # if the password was the user's username, or "password123",
     # when using an SSH key password checker.
-    handle_found_password_output(
+    handle_found_password(
         password=password,
         i=i,
         t=None,
