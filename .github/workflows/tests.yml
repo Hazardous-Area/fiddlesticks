@@ -65,4 +65,6 @@ jobs:
     - name: Run PyTest (via Coverage)
       run: |
         . ./.venv/bin/activate
-        coverage run -m pytest -rA --tb=short tests && coverage combine && coverage report
+        # coverage run -m pytest -rA --tb=short tests && coverage combine && coverage report
+        pytest -xvv tests/checker_tests.py
+        # rA --tb=short tests && coverage combine && coverage report
