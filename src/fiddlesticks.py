@@ -714,7 +714,7 @@ class SSHPEMKeyChecker(_SSHKeyCheckerBase):
 
         from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
-        self.loader = (load_pem_private_key,)
+        self.loader = load_pem_private_key
 
         # Defined in cryptography's Rust extension since Apr 2025
         self.incorrect_password_msg = "Incorrect password, could not decrypt key"
