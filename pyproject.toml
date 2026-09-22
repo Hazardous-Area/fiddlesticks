@@ -39,14 +39,22 @@ py7zr = [
 msoffice = [
     "msoffcrypto-tool",
 ]
+# Optional deps not on PyPi (e.g. from packages.ubuntu.com):
+# - 7zip
+# - Veracrypt
+
 
 [dependency-groups]
+all_optional_deps = [
+        "fiddlesticks[ssh,keepassxc,aegis,py7zr,msoffice]",
+]
 dev = [
+    {include-group= "all_optional_deps"},
     {include-group = "lint"},
     {include-group = "test"},
 ]
 test = [
-    "fiddlesticks[ssh,keepassxc,aegis,py7zr,msoffice]",
+    {include-group= "all_optional_deps"},
     "psutil",
     "pytest",
     "hypothesis",

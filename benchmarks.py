@@ -1,4 +1,4 @@
-import os
+import argparse
 import time
 from collections import deque
 from pathlib import Path
@@ -115,7 +115,7 @@ files = {
 
 
 def benchmark_candidate_testing(
-    output_file: os.PathLike = Path("fiddlesticks_benchmarks.txt"),
+    output_file: Path = Path("fiddlesticks_benchmarks.txt"),
     max_time_s: int = 1000,
     max_num_subs: int = 3,
 ):
@@ -169,10 +169,12 @@ def benchmark_candidate_testing(
 
             file_name = file.as_posix()
             checker_factory = fiddlesticks._default_factory_selector(file_name)
-            checker = checker_factory(file_name)
+
             t0 = time.time()
-            fiddlesticks.check_passwords_sequentially(pwds, checker)
+            with checker_factory(file_name) as checker:
+                fiddlesticks.check_passwords_sequentially(pwds, checker)
             t1 = time.time()
+
             t_s = t1 - t0
 
             per_pwd_ms = 1000 * t_s // N
@@ -182,7 +184,17 @@ def benchmark_candidate_testing(
         output("\n")
 
 
-benchmark_candidate_testing()
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--output-file", type=Path, default=Path("fiddlesticks_benchmarks.txt")
+)
+parser.add_argument("--max-time-s", type=int, default=1000)
+parser.add_argument("--max-num-subs", type=int, default=3)
+
+
+if __name__ == "__main__":
+    namespace = parser.parse_args()
+    benchmark_candidate_testing(**vars(namespace))
 
 # E.g.
 # fiddlesticks_benchmarks.txt

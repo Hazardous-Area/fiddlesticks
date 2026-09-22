@@ -1,0 +1,7 @@
+## Benchmarks
+ - fiddlesticks v0.6.0.dev
+ - guess='correcthorsebatterystaple'
+
+| Num subs |Num pwds | .xlsx/s | per pwd/ms | .kdbx/s | per pwd/ms | .json/s | per pwd/ms | .7z  /s | per pwd/ms | .key /s | per pwd/ms | .hc  /s | per pwd/ms |
+|----------|:-------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|
+|        0 |       1 |
