@@ -13,6 +13,7 @@ from fiddlesticks import (
     SubprocessChecker,
     VeracryptChecker,
     _make_new_tmp_sub_dir,
+    _SSHKeyCheckerBase,
     check_passwords_sequentially,
     make_ssh_key_checker,
 )
@@ -157,3 +158,22 @@ def test_veracrypt_checker(tmp_path):
     # This can fail if the volume is already mounted, or
     # if something is already mounted to the same mount point.
     assert checker("test")
+
+
+def test_SSH_base_class_cannot_be_instantiated():
+
+    class SSHCheckerWithoutLoader(_SSHKeyCheckerBase):
+        incorrect_password_msg = "foo"
+
+    class SSHCheckerWithoutErrorMsg(_SSHKeyCheckerBase):
+        # Not a valid loader, but anything
+        # other than None will do for this test.
+        loader = object()
+
+    for Class in (
+        _SSHKeyCheckerBase,
+        SSHCheckerWithoutLoader,
+        SSHCheckerWithoutErrorMsg,
+    ):
+        with pytest.raises(TypeError):
+            Class(file="some_key_file.pem")
