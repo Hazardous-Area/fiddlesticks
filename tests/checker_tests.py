@@ -9,7 +9,7 @@ from fiddlesticks import (
     IS_WINDOWS,
     _make_new_tmp_sub_dir,
     check_passwords_sequentially,
-    make_MS_Office_files_key_checker,
+    MS_OfficeFilesKeyChecker,
     make_py_avdu_aegis_checker,
     make_pykeepass_checker,
     make_ssh_key_checker,
@@ -137,7 +137,7 @@ def test_ssh_key_checker_bad_file(tmp_path):
 
 @pytest.mark.parametrize("path", [XLSX_FILE, DOCX_FILE])
 def test_ms_office_crypto_tool_checker(path: Path):
-    checker = make_MS_Office_files_key_checker(path)
+    checker = MS_OfficeFilesKeyChecker(path)
     assert not checker("not_test")
     assert checker("test")
 
