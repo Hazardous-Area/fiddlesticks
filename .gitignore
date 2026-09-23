@@ -15,3 +15,6 @@ wheels/
 # Dev environment lock file
 # (to avoid confusion with possible application lock files)
 uv.lock
+
+# Harmless temporary test artefact
+./test.json

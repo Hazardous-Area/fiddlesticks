@@ -19,8 +19,6 @@
 # ]
 # ///
 
-__version__ = "0.6.0.dev"
-
 import argparse
 import getpass
 import io

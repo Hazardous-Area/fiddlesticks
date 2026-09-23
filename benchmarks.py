@@ -1,9 +1,15 @@
 import argparse
 import time
+import tomllib
 from collections import deque
 from pathlib import Path
 
 import fiddlesticks
+
+metadata = tomllib.loads(Path("pyproject.toml").read_text())
+version = metadata["project"]["version"]
+# version = fiddlesticks.__version__
+
 
 # guess = "abcd"
 guess = "correcthorsebatterystaple"
@@ -124,7 +130,7 @@ def benchmark_candidate_testing(
         with open(output_file, "at") as f:
             f.write(s)
 
-    msg = f"## Benchmarks\n - fiddlesticks v{fiddlesticks.__version__}\n - {guess=}"
+    msg = f"## Benchmarks\n - fiddlesticks v{version}\n - {guess=}"
     print(msg)
     output(f"{msg}\n\n")
 

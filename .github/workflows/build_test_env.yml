@@ -1,0 +1,73 @@
+name: Build docker image for the test environment
+
+on:
+  workflow_dispatch:
+
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build_test_env:
+    runs-on: ubuntu-26.04
+
+    steps:
+    - name: Check out repo
+      uses: actions/checkout@v7
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+      # Only login if workflow trigger is NOT a PR from a fork.
+    - name: Log in to GHCR
+      if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract Docker metadata
+      id: docker_metadata
+      uses: docker/metadata-action@v6
+      with:
+        images: ghcr.io/${{ github.repository }}/test_env
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,format=short
+
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: Dockerfile
+        build-args: |
+          INSTALL_7Z=true
+          INSTALL_VERACRYPT=true
+          TEST_ENV=true
+        tags: ${{ steps.docker_metadata.outputs.tags }}
+        # Only push to the registry if it's a branch push or internal PR.
+        push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        # Otherwise, only load, so the image builds locally for testing.
+        load: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max   
+
+
+    # - name: Run Docker Container from image
+    #   # Force the repository path to lowercase using Bash parameter expansion
+    #   # (,, is lower casing operator).
+    #   run: |
+    #     THIS_REPO="${{ github.repository }}"
+    #     IMAGE_NAME="ghcr.io/${THIS_REPO,,}/test_env"
+    #     CODE_UNDER_TEST="/tmp/fiddlesticks"
+        
+    #     docker run --rm \
+    #       -v .:${CODE_UNDER_TEST} \
+    #       ${IMAGE_NAME}:${{ steps.docker_metadata.outputs.version }} \
+    #       sh -c ". .venv/bin/activate && pip install ${CODE_UNDER_TEST}[all] && pytest -vvx"
+
+    #     # sh -c ". .venv/bin/activate && pip install ${CODE_UNDER_TEST}[all] && coverage run -m pytest -rA --tb=short ${CODE_UNDER_TEST}/tests && coverage combine && coverage report"
+
