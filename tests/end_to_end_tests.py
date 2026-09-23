@@ -245,6 +245,15 @@ def test_first_index_with_num_subs_4_default_command_and_docx():
     assert result.returncode == 0
 
 
+def test_all_cores_with_docx():
+    result = subprocess.run(
+        _collate_args(4, ["7357"], DOCX_FILE.as_posix(), "--num-cores", "all"),
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0
+
+
 @pytest.mark.parametrize(
     "file",
     [DOCX_FILE],

@@ -2,6 +2,7 @@ import builtins  # noqa: F401
 import contextlib
 import io
 import json
+import os  # noqa: F401
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -18,8 +19,10 @@ from hypothesis.strategies import composite, integers, lists
 
 from fiddlesticks import (
     IS_WINDOWS,
+    UnknownCPUCount,
     _get_hopefully_incorrect_password,
     cli,
+    get_cpu_count,
     handle_found_password,
     offer_to_skip_indices_ruled_out_by_progress_file,
     save_ruled_out_indices_to_progress_file,
@@ -215,3 +218,11 @@ def test_save_ruled_out_indices_to_progress_file(args: tuple[list[int], int]):
 
     assert smallest_after_trimming == trimmed_indices[0]
     assert smallest_after_trimming + 1 == starting_index
+
+
+def test_get_cpu_count_returns_None_raises_Exception():
+    with (
+        patch("os.process_cpu_count", side_effect=[None]),
+        pytest.raises(UnknownCPUCount),
+    ):
+        get_cpu_count()

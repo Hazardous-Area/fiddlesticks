@@ -166,6 +166,19 @@ limiting the substitutions to specific characters in a password guess.
 At the very least, real world adversaries (posessing a stolen file or password hash) are likely to first attempt a [dictionary attack](https://en.wikipedia.org/wiki/Dictionary_attack#Dictionary_attack_software)
 
 ## Benchmarks
+ - Github Actions Ubuntu runner (4 core)
+ 
+| Num subs |Num pwds | .xlsx/s | per pwd/ms | .kdbx/s | per pwd/ms | .json/s | per pwd/ms | .7z  /s | per pwd/ms | .key /s | per pwd/ms | .hc  /s | per pwd/ms |
+|----------|:-------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|
+|        0 |       1 |        0|         1.0|        0|         0.0|        0|         1.0|        0|         0.0|        0|       164.0|        0|         1.0|
+|        1 |      42 |        0|        11.0|        0|         5.0|        0|         6.0|        0|         0.0|        0|         6.0|        0|         8.0|
+|        2 |     842 |        3|         3.0|        1|         2.0|        2|         2.0|        2|         2.0|        2|         3.0|        1|         2.0|
+|        3 |   10724 |       38|         3.0|       22|         2.0|       28|         2.0|       29|         2.0|       27|         2.0|       28|         2.0|
+|        4 |   97431 |      281|         2.0|      254|         2.0|      233|         2.0|      212|         2.0|      254|         2.0|      240|         2.0|
+|        5 |  672118 |     1883|         2.0|     1967|         2.0|     1636|         2.0|     1701|         2.0|     1382|         2.0|     1497|         2.0|
+
+
+
  - Hetzner CX23 x86 4GB
  - fiddlesticks v0.5.0.dev
  - guess=[`correcthorsebatterystaple`](https://xkcd.com/936/)
@@ -176,3 +189,4 @@ At the very least, real world adversaries (posessing a stolen file or password h
 |        1 |      42 |        2|        59.0|        3|        90.0|        6|       147.0|        9|       230.0|       10|       257.0|         |            |
 |        2 |     842 |       46|        55.0|       76|        90.0|      121|       144.0|      186|       221.0|      216|       257.0|         |            |
 |        3 |   10724 |      573|        53.0|      991|        92.0|         |            |         |            |         |            |         |            |
+

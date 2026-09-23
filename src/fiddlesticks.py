@@ -26,6 +26,7 @@ import getpass
 import io
 import json
 import math
+import os
 import string
 import subprocess
 import sys
@@ -47,6 +48,24 @@ TMP_DIR.mkdir(exist_ok=True)
 DEFAULT_PROGRESS_FILE = TMP_DIR / "fiddlesticks_progress.json"
 IS_WINDOWS = sys.platform == "win32"
 type FileT = str | Path
+
+type GuessInfo = tuple[int, tuple[str, int]]
+
+
+class UnknownCPUCount(Exception):
+    pass
+
+
+def get_cpu_count() -> int:
+    cpu_count = (
+        os.process_cpu_count() if sys.version_info >= (3, 13) else os.cpu_count()
+    )
+    if cpu_count is None:
+        raise UnknownCPUCount(
+            f"Could not find number of CPU cores to run on, {cpu_count=}"
+        )
+    return cpu_count
+
 
 SHIFT_MAP: dict[str, str] = {
     "1": "!",
@@ -957,6 +976,15 @@ parser.add_argument(
         "that will be applied to the guess. Default: 0"
     ),
 )
+parser.add_argument(
+    "--num-cores",
+    "-j",
+    type=str,
+    default="1",
+    help=(
+        'The number of CPU cores to use for the search (or "all" for all available). Default: 1'
+    ),
+)
 parser.add_argument("--verbosity", "-v", action="count", default=0)
 parser.add_argument(
     "--update-every",
@@ -1168,6 +1196,11 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
     new_search = kwargs.pop("new_search")
     force_resume = kwargs.pop("resume")
     first_index: int | None = kwargs.pop("first_index")
+    num_cores_str = kwargs.pop("num_cores")
+    if num_cores_str.strip().lower() == "all":
+        _num_cores = get_cpu_count()
+    else:
+        _num_cores = int(num_cores_str)
 
     if DEFAULT_PROGRESS_FILE.is_file():
         if not new_search and first_index is None:
