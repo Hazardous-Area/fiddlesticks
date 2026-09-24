@@ -1,3 +1,4 @@
+import contextlib
 import stat
 import subprocess
 from pathlib import Path
@@ -11,6 +12,7 @@ from fiddlesticks import (
     PyAvduAegisChecker,
     PyKeepassChecker,
     SubprocessChecker,
+    Updater,
     VeracryptChecker,
     _make_new_tmp_sub_dir,
     _SSHKeyCheckerBase,
@@ -79,16 +81,36 @@ set -eu
 
 
 def test_sequential_passwords_checker_verbosity_2(capsys):
+
+    @contextlib.contextmanager
+    def dummy_checker_maker(*args, **kwds):
+        yield (lambda candidate: False)
+
     result = check_passwords_sequentially(
-        candidates=[("A", 0), ("B", 0), ("C", 0)],
-        test_func=lambda candidate: False,
-        verbosity=2,
+        indexed_candidates=list(enumerate([("A", 0), ("B", 0), ("C", 0)])),
+        checker_maker=dummy_checker_maker,
         update_every=1,
-        total=3,
-        print_passwords=True,
+        updater=Updater(verbosity=2, total=3, print_passwords=True),
     )
     capsys.readouterr()
     assert result is None
+
+
+def test_sequential_passwords_warns_on_multiple_cores(capsys):
+
+    @contextlib.contextmanager
+    def dummy_checker_maker(*args, **kwds):
+        yield (lambda candidate: False)
+
+    with pytest.warns(UserWarning):
+        check_passwords_sequentially(
+            indexed_candidates=[],
+            checker_maker=dummy_checker_maker,
+            update_every=1,
+            updater=Updater(),
+            num_cores=2,
+        )
+    capsys.readouterr()
 
 
 @pytest.mark.skipif(
@@ -98,7 +120,12 @@ def test_ssh_key_checker(tmp_path):
     ssh_test_keys = _try_make_ssh_key_files(tmp_path)
     for key_file, pw in ssh_test_keys:
         assert key_file.is_file()
-        checker = make_ssh_key_checker(key_file)
+        try:
+            checker = make_ssh_key_checker(key_file)
+        except* ValueError:
+            print(f"{key_file.read_bytes()=}")
+            raise
+
         assert not checker("incorrect")
         assert checker(pw)
 

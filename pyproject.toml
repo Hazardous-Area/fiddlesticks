@@ -87,6 +87,7 @@ markers = [
 python_files = "test_*.py *_test.py *_tests.py"
 
 [tool.coverage.run]
+concurrency = ["multiprocessing"]
 source = ["src"]
 omit = ["tests/*"]
 patch = ["subprocess"]

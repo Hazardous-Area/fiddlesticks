@@ -25,6 +25,7 @@ import io
 import json
 import math
 import os
+import queue
 import string
 import subprocess
 import sys
@@ -33,11 +34,13 @@ import textwrap
 import time
 import warnings
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from itertools import combinations, cycle, islice, product
+from multiprocessing import Process, Queue
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 TMP_DIR = (
     Path(tempfile.gettempdir()) / "fiddlesticks"
@@ -46,8 +49,8 @@ TMP_DIR.mkdir(exist_ok=True)
 DEFAULT_PROGRESS_FILE = TMP_DIR / "fiddlesticks_progress.json"
 IS_WINDOWS = sys.platform == "win32"
 type FileT = str | Path
-
-type GuessInfo = tuple[int, tuple[str, int]]
+type GuessInfo = tuple[str, int]
+type IndexedGuessInfo = tuple[int, tuple[str, int]]
 
 
 class UnknownCPUCount(Exception):
@@ -167,7 +170,7 @@ def _candidates_from_num_subs(
     num_subs: int,
     char_indexed_alts: dict[int, list[str]],
     first_index: int = 0,
-) -> Iterator[tuple[str, int]]:
+) -> Iterator[GuessInfo]:
     if num_subs == 0:
         yield guess, 0
         return
@@ -219,7 +222,7 @@ def roundrobin(*iterables):
 #     guesses_alts: dict[str, dict[int, list[str]]],
 #     first_index: int = 0,
 #     num_subs: int,
-# ) -> Iterator[tuple[str, int]]:
+# ) -> Iterator[GuessInfo]:
 #     iterators = (
 #         _candidates_from_num_subs(guess, num_subs, alts)
 #         for guess, alts in guesses_alts.items()
@@ -232,7 +235,7 @@ def _roundrobin_all_guesses(
     guesses_alts: dict[str, dict[int, list[str]]],
     guesses_sub_totals: dict[str, int],
     first_index: int = 0,
-) -> Iterator[tuple[str, int]]:
+) -> Iterator[GuessInfo]:
 
     num_skipped = num_skipped_per_unexhausted_iterator = smallest_iterator_length = 0
 
@@ -354,7 +357,7 @@ def _candidates_from_first_index(
     first_index: int,
     sub_totals: dict[int, dict[str, int]],
     guesses_alts: dict[str, dict[int, list[str]]],
-) -> Iterator[tuple[str, int]]:
+) -> Iterator[GuessInfo]:
     num_skipped = 0
     for num_subs, d in sub_totals.items():
         sub_total = sum(d.values())
@@ -376,7 +379,7 @@ def candidate_passwords_from_alt_chars(
     min_subs: int = 0,
     max_subs: int = 2,
     alt_char_map: defaultdict[str, list[str]] = SHIFT_AND_LEET_BI_MAP,
-) -> tuple[int, Iterator[tuple[str, int]]]:
+) -> tuple[int, Iterator[IndexedGuessInfo]]:
 
     if not guesses:
         return 0, iter([])
@@ -384,9 +387,8 @@ def candidate_passwords_from_alt_chars(
     guesses_alts = _make_guesses_alt_chars(guesses, alt_char_map)
 
     sub_totals = _calculate_sub_totals(guesses_alts, min_subs, max_subs)
-    total_num_candidates = (
-        sum(sum(guess_totals.values()) for guess_totals in sub_totals.values())
-        - first_index
+    total_num_candidates = sum(
+        sum(guess_totals.values()) for guess_totals in sub_totals.values()
     )
 
     candidates = _candidates_from_first_index(
@@ -395,7 +397,7 @@ def candidate_passwords_from_alt_chars(
         guesses_alts=guesses_alts,
     )
 
-    return total_num_candidates, candidates
+    return total_num_candidates, enumerate(candidates, start=first_index)
 
 
 def handle_found_password(
@@ -431,6 +433,11 @@ class Checker(AbstractContextManager):
 
     def close(self):
         pass
+
+
+type CheckerFactoryT = (
+    type[Checker] | Any
+)  # TODO: Specify nice ParamSpec or define Protocol
 
 
 class Py7zrChecker(Checker):
@@ -713,27 +720,28 @@ def make_ssh_key_checker(file: FileT, **kwargs):
 
 
 class OpenSSHKeyChecker(_SSHKeyCheckerBase):
+    # Defined in cryptography's ssh.py, since 2020
+    incorrect_password_msg = "Corrupt data: broken checksum"
+
     def __init__(self, file: FileT, **kwargs):
 
         from cryptography.hazmat.primitives.serialization import load_ssh_private_key
 
         self.loader = load_ssh_private_key
 
-        # Defined in cryptography's ssh.py, since 2020
-        self.incorrect_password_msg = "Corrupt data: broken checksum"
         super().__init__(file=file, **kwargs)
 
 
 class SSHPEMKeyChecker(_SSHKeyCheckerBase):
+    # Defined in cryptography's Rust extension since Apr 2025
+    incorrect_password_msg = "Incorrect password, could not decrypt key"
+    # TODO: Investigate the other error strings that have been seen.  See misc_tests.py
+
     def __init__(self, file: FileT, **kwargs):
 
         from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
         self.loader = load_pem_private_key
-
-        # Defined in cryptography's Rust extension since Apr 2025
-        self.incorrect_password_msg = "Incorrect password, could not decrypt key"
-        # TODO: Investigate the other error strings that have been seen.  See misc_tests.py
 
         super().__init__(file=file, **kwargs)
 
@@ -797,7 +805,7 @@ class VeracryptChecker(SubprocessChecker):
 def save_ruled_out_indices_to_progress_file(
     indices: list[int],
     saved_progress_file: Path = DEFAULT_PROGRESS_FILE,
-):
+) -> list[int]:
     saved_indices: list[int]
     if saved_progress_file.is_file():
         saved_indices = json.loads(saved_progress_file.read_text())[
@@ -820,6 +828,8 @@ def save_ruled_out_indices_to_progress_file(
     saved_progress_file.write_text(
         json.dumps({"ruled_out_candidates_indices": saved_indices})
     )
+
+    return saved_indices
 
 
 def offer_to_skip_indices_ruled_out_by_progress_file(
@@ -849,63 +859,215 @@ def offer_to_skip_indices_ruled_out_by_progress_file(
             ).lower()
             == "y"
         ):
+            # Reset saved progress (our approach does not actually skip indices
+            # other than those before the first saved ruled out one, so all
+            # subsequent ruled out indices are dropped, costing a little
+            # extra repeated computation.
             save_ruled_out_indices_to_progress_file([ruled_out[0]], saved_progress_file)
             return resume_from
     return 0
 
 
-def check_passwords_sequentially(
-    candidates: Iterable[tuple[str, int]],
-    test_func: Callable[[str], bool],
-    verbosity: int = 0,
-    update_every: int | None = None,
-    total: int | None = None,
-    print_passwords: bool = False,
-    first_index: int = 0,
-    **kwargs,
-) -> tuple[str, int] | None:
+@dataclass
+class Updater:
+    verbosity: int = 0
+    total: int | None = None
+    print_passwords: bool = False
 
-    out_of_total = "" if total is None else f"/{total - 1}"  # Highest index
+    def __post_init__(self):
+        self.out_of_total = (
+            "" if self.total is None else f"/{self.total - 1}"
+        )  # Highest index
+        self.last_printed_num_subs = 0
 
-    if update_every is None:
-        update_every = 40 if total is None else max(1, total // 300)
+    def update(self, indexed_guess_info: IndexedGuessInfo):
 
-    if verbosity >= 1:
-        update_every = min(update_every, 1000)
+        i, (candidate, num_subs) = indexed_guess_info
 
-    last_printed_num_subs = 0
-    for i, (candidate, num_subs) in enumerate(candidates, start=first_index):
-        if test_func(candidate):
-            return candidate, i
-
-        save_ruled_out_indices_to_progress_file([i])
-
-        if i % update_every:
-            continue
-        if verbosity == 0:
+        if self.verbosity == 0:
             print_to_stderr(".", end="", flush=True)
             # If testing multiple guesses at the same time, the current
             # number of substitutions for each might not be synchronised.
-            if num_subs > last_printed_num_subs:
+            # If num_subs is not increasing, this will cause a minor bug,
+            # skipping of these update messages.
+            if num_subs > self.last_printed_num_subs:
                 print_to_stderr(
                     f"Now testing candidates formed by {num_subs} substitutions from guess"
                 )
-                last_printed_num_subs = num_subs
-        elif verbosity >= 2 and print_passwords:
+                self.last_printed_num_subs = num_subs
+        elif self.verbosity >= 2 and self.print_passwords:
             print_to_stderr(
-                f"{i}{out_of_total}) tried: {candidate} (num substitutions={num_subs})",
+                f"{i}{self.out_of_total}) tried: {candidate} (num substitutions={num_subs})",
                 flush=True,
             )
         else:
             # verbosity == 1 or (verbosity ==2 and not print_passwords)
             print_to_stderr(
-                f"{i}{out_of_total}, num substitutions={num_subs}", flush=True
+                f"{i}{self.out_of_total}, num substitutions={num_subs}", flush=True
             )
+
+
+def check_passwords_sequentially(
+    indexed_candidates: Iterable[IndexedGuessInfo],
+    checker_maker: CheckerFactoryT,
+    *extras: str,
+    update_every: int,
+    updater: Updater,
+    num_cores: int = 0,
+    first_index: int = 0,
+    **kwargs,
+) -> IndexedGuessInfo | None:
+
+    if num_cores >= 2:
+        warnings.warn(
+            f"check_passwords_sequentially only uses 1 core.  Got {num_cores=}"
+        )
+
+    with checker_maker(*extras, **kwargs) as checker:
+        for indexed_candidate_info in indexed_candidates:
+            i, (candidate, _num_subs) = indexed_candidate_info
+
+            if checker(candidate):
+                return indexed_candidate_info
+
+            save_ruled_out_indices_to_progress_file([i])
+
+            if i % update_every == 0:
+                updater.update(indexed_candidate_info)
 
     return None
 
 
-default_password_protected_file_checker_factories = {
+class Worker:
+    def __init__(
+        self,
+        found_passwords: Queue[IndexedGuessInfo],
+        guesses: Queue[IndexedGuessInfo],
+        incorrect_guess_indices: Queue[IndexedGuessInfo],
+        checker_maker: CheckerFactoryT,
+        *extras: str,
+        **kwargs,
+    ):
+        self.found_passwords = found_passwords
+        self.guesses = guesses
+        self.incorrect_guess_indices = incorrect_guess_indices
+        self.checker = checker_maker(*extras, **kwargs)
+        self.quit: bool = False
+
+    def __call__(self):
+        while self.found_passwords.empty() and not self.quit:
+            self.get_and_check_next_guess()
+
+    def get_and_check_next_guess(self):
+
+        try:
+            guess_info = self.guesses.get(timeout=10)
+        except queue.Empty:
+            self.quit = True
+            return
+
+        _index, (guess, _num_subs) = guess_info
+
+        if self.checker(guess):
+            self.found_passwords.put(guess_info)
+        else:
+            self.incorrect_guess_indices.put(guess_info)
+
+
+def check_passwords_in_parallel(
+    indexed_candidates: Iterable[IndexedGuessInfo],
+    checker_maker: CheckerFactoryT,
+    *extras: str,
+    update_every: int,
+    updater: Updater,
+    num_cores: int = 1,
+    first_index: int = 0,
+    total: int | None = None,
+    min_queue_size: int = 1_000,
+    max_queue_size: int = 10_000,
+    **kwargs,
+) -> IndexedGuessInfo | None:
+
+    guesses = iter(indexed_candidates)
+    found_passwords: Queue[IndexedGuessInfo] = Queue(maxsize=1)
+    queued_guesses: Queue[IndexedGuessInfo] = Queue(maxsize=max_queue_size)
+    incorrect_guess_indices: Queue[IndexedGuessInfo] = Queue(maxsize=max_queue_size)
+
+    workers = [
+        Worker(
+            found_passwords,
+            queued_guesses,
+            incorrect_guess_indices,
+            checker_maker,
+            *extras,
+            **kwargs,
+        )
+        for i in range(1, num_cores)
+    ]
+    processes = [
+        Process(
+            target=worker,
+            args=(),
+        )
+        for worker in workers
+    ]
+    parent_worker = Worker(
+        found_passwords,
+        queued_guesses,
+        incorrect_guess_indices,
+        checker_maker,
+        *extras,
+        **kwargs,
+    )
+    workers.insert(0, parent_worker)
+
+    unqueued_candidates = True
+
+    for process in processes:
+        process.start()
+
+    with parent_worker.checker:
+        while found_passwords.empty():
+            approx_queue_size = queued_guesses.qsize()
+            if unqueued_candidates and approx_queue_size <= min_queue_size:
+                # Or while workers not timed out
+                guess_info = next(guesses, None)
+                if guess_info is None:
+                    unqueued_candidates = False
+                else:
+                    queued_guesses.put(guess_info)
+                    continue
+
+            indices: list[int] = []
+            while True:
+                try:
+                    indexed_guess_info = incorrect_guess_indices.get_nowait()
+                except queue.Empty:
+                    break
+                i, (_pw_guess, _num_subs) = indexed_guess_info
+                indices.append(i)
+                updater.update(indexed_guess_info)
+
+            save_ruled_out_indices_to_progress_file(indices)
+
+            if parent_worker.quit and not any(
+                process.is_alive() for process in processes
+            ):
+                break
+
+            parent_worker.get_and_check_next_guess()
+
+    for process in processes:
+        if process.is_alive():
+            process.join()  # pragma: nocov
+
+    try:
+        return found_passwords.get_nowait()
+    except queue.Empty:
+        return None
+
+
+default_Checkers = {
     ".7z": SevenZipChecker,
     ".json": PyAvduAegisChecker,
     ".kdbx": PyKeepassChecker,
@@ -920,7 +1082,7 @@ default_password_protected_file_checker_factories = {
 }
 
 
-def _default_factory_selector(*args: str):
+def _default_Checker_selector(*args: str):
     if not args:
         raise ValueError(
             "Default checker requires arg(s) to define how to test the passwords"
@@ -929,7 +1091,7 @@ def _default_factory_selector(*args: str):
     path = Path(args[0])
 
     if len(args) == 1 and path.is_file():
-        return default_password_protected_file_checker_factories[path.suffix.lower()]
+        return default_Checkers[path.suffix.lower()]
 
     return SubprocessChecker
 
@@ -1194,11 +1356,17 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
     new_search = kwargs.pop("new_search")
     force_resume = kwargs.pop("resume")
     first_index: int | None = kwargs.pop("first_index")
+    update_every = kwargs.pop("update_every")
     num_cores_str = kwargs.pop("num_cores")
     if num_cores_str.strip().lower() == "all":
-        _num_cores = get_cpu_count()
+        num_cores = get_cpu_count()
     else:
-        _num_cores = int(num_cores_str)
+        num_cores = int(num_cores_str)
+
+    if num_cores <= 1:
+        main_search_function = check_passwords_sequentially
+    else:
+        main_search_function = check_passwords_in_parallel
 
     if DEFAULT_PROGRESS_FILE.is_file():
         if not new_search and first_index is None:
@@ -1210,7 +1378,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         first_index = 0
 
     if ns.command is None:
-        command = _default_factory_selector(*extras)
+        command = _default_Checker_selector(*extras)
     else:
         command = ns.command
 
@@ -1241,12 +1409,28 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         alt_char_map=alt_char_map,
     )
 
+    if update_every is None:
+        update_every = 40 if total is None else max(1, total // 300)
+
+    if ns.verbosity >= 1:
+        update_every = min(update_every, 1000)
+
+    updater = Updater(
+        verbosity=ns.verbosity, total=total, print_passwords=ns.print_passwords
+    )
+
     t0 = time.time()
 
-    with command(*extras, **kwargs) as checker:
-        result = check_passwords_sequentially(
-            candidates, checker, total=total, **kwargs
-        )
+    result = main_search_function(
+        candidates,
+        command,
+        *extras,
+        num_cores=num_cores,
+        total=total,
+        update_every=update_every,
+        updater=updater,
+        **kwargs,
+    )
 
     t1 = time.time()
 
@@ -1261,7 +1445,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
             print_to_stderr(f"Search took: {t1 - t0:.3f} seconds")
         return 1
 
-    password, i = result
+    i, (password, _num_subs) = result
 
     handle_found_password(password, i, t1 - t0, **kwargs)
 

@@ -19,6 +19,8 @@ from hypothesis.strategies import composite, integers, lists
 
 from fiddlesticks import (
     IS_WINDOWS,
+    OpenSSHKeyChecker,
+    SSHPEMKeyChecker,
     UnknownCPUCount,
     _get_hopefully_incorrect_password,
     cli,
@@ -86,18 +88,18 @@ def test_are_error_strings_in_cryptography_unchanged(tmp_path):
     n = 0
     for error_str, loader, file in [
         (
-            "Corrupt data: broken checksum",
+            OpenSSHKeyChecker.incorrect_password_msg,
             load_ssh_private_key,
             keyfiles_and_pwds[-1][0],
         ),
         (
-            "Incorrect password, could not decrypt key",
+            SSHPEMKeyChecker.incorrect_password_msg,
             load_pem_private_key,
             keyfiles_and_pwds[1][0],
         ),
         # Seen other errors:
+        # 1)
         #
-        #         3
         # =================================== FAILURES ===================================
         # _______________ test_are_error_strings_in_cryptography_unchanged _______________
         # tests/misc_tests.py:78: in test_are_error_strings_in_cryptography_unchanged
@@ -106,6 +108,49 @@ def test_are_error_strings_in_cryptography_unchanged(tmp_path):
         # E   If your key is in PKCS#8 format, you must use BEGIN/END PRIVATE KEY PEM delimiters
         #
         # https://github.com/Hazardous-Area/fiddlesticks/actions/runs/33859787867/job/100981355309#logs
+        #
+        # 2)
+        #         _____________________________ test_ssh_key_checker _____________________________
+        # + Exception Group Traceback (most recent call last):
+        # |   File "/__w/fiddlesticks/fiddlesticks/tests/checker_tests.py", line 122, in test_ssh_key_checker
+        # |     checker = make_ssh_key_checker(key_file)
+        # |   File "/__w/fiddlesticks/fiddlesticks/src/fiddlesticks.py", line 712, in make_ssh_key_checker
+        # |     raise ExceptionGroup(
+        # |     ...<5 lines>...
+        # |     )
+        # | ExceptionGroup: Could not find valid SSH key loader for file=PosixPath('/tmp/pytest-of-root/pytest-0/test_ssh_key_checker0/openssl_PEM.key'). Is it corrupted or in the incorrect format? (2 sub-exceptions)
+        # +-+---------------- 1 ----------------
+        #     | Traceback (most recent call last):
+        #     |   File "/__w/fiddlesticks/fiddlesticks/src/fiddlesticks.py", line 708, in make_ssh_key_checker
+        #     |     return factory(file, **kwargs)
+        #     |   File "/__w/fiddlesticks/fiddlesticks/src/fiddlesticks.py", line 730, in __init__
+        #     |     super().__init__(file=file, **kwargs)
+        #     |     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+        #     |   File "/__w/fiddlesticks/fiddlesticks/src/fiddlesticks.py", line 659, in __init__
+        #     |     self.loader(
+        #     |     ~~~~~~~~~~~^
+        #     |         self.private_key_data, ***
+        #     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        #     |     )
+        #     |     ^
+        #     |   File "/fiddlesticks/.venv/lib/python3.14/site-packages/cryptography/hazmat/primitives/serialization/ssh.py", line 689, in load_ssh_private_key
+        #     |     raise ValueError("Not OpenSSH private key format")
+        #     | ValueError: Not OpenSSH private key format
+        #     +---------------- 2 ----------------
+        #     | Traceback (most recent call last):
+        #     |   File "/__w/fiddlesticks/fiddlesticks/src/fiddlesticks.py", line 708, in make_ssh_key_checker
+        #     |     return factory(file, **kwargs)
+        #     |   File "/__w/fiddlesticks/fiddlesticks/src/fiddlesticks.py", line 744, in __init__
+        #     |     super().__init__(file=file, **kwargs)
+        #     |     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+        #     |   File "/__w/fiddlesticks/fiddlesticks/src/fiddlesticks.py", line 659, in __init__
+        #     |     self.loader(
+        #     |     ~~~~~~~~~~~^
+        #     |         self.private_key_data, ***
+        #     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        #     |     )
+        #     |     ^
+        #     | ValueError: Could not deserialize key data. The data may be in an incorrect format, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters). Details: ASN.1 parsing error: invalid length
     ]:
         private_key_data = file.read_bytes()
         try:
@@ -226,3 +271,21 @@ def test_get_cpu_count_returns_None_raises_Exception():
         pytest.raises(UnknownCPUCount),
     ):
         get_cpu_count()
+
+
+def test_multiple_cores_to_let_coverage_measure_lines_properly(capsys):
+
+    #     with pytest.warns(UserWarning):
+    #         ^^^^^^^^^^^^^^^^^^^^^^^^^
+    # E   Failed: DID NOT WARN. No warnings of type (<class 'UserWarning'>,) were emitted.
+
+    retcode = cli(
+        [
+            "--max-subs=4",
+            "--password-guess=7357",
+            DOCX_FILE.as_posix(),
+            "--num-cores=all",
+        ]
+    )
+    assert 0 == retcode
+    capsys.readouterr()

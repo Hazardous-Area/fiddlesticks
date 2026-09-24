@@ -174,11 +174,14 @@ def benchmark_candidate_testing(
                 continue
 
             file_name = file.as_posix()
-            checker_factory = fiddlesticks._default_factory_selector(file_name)
+            checker_factory = fiddlesticks._default_Checker_selector(file_name)
+            updater = fiddlesticks.Updater()
 
             t0 = time.time()
             with checker_factory(file_name) as checker:
-                fiddlesticks.check_passwords_sequentially(pwds, checker)
+                fiddlesticks.check_passwords_sequentially(
+                    pwds, checker, update_every=1000, updater=updater
+                )
             t1 = time.time()
 
             t_s = t1 - t0
