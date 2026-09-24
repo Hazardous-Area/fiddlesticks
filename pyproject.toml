@@ -12,7 +12,7 @@ authors = [
     { name = "James Parrott", email = "james@jamesparrott.dev" }
 ]
 requires-python = ">=3.13"
-dynamic=["version"]
+version = "0.6.0.dev"
 
 dependencies = []
 
@@ -39,9 +39,14 @@ py7zr = [
 msoffice = [
     "msoffcrypto-tool",
 ]
-# Optional deps not on PyPi (e.g. from packages.ubuntu.com):
+all = [
+    "fiddlesticks[ssh,keepassxc,aegis,py7zr,msoffice]",
+]
+# Note.  Some features also require optional dependencies 
+# that are not available on PyPi (and must be installed from
+# elsewhere, e.g. from packages.ubuntu.com):
 # - 7zip
-# - Veracrypt
+# - veracrypt
 
 
 [dependency-groups]
@@ -54,8 +59,6 @@ dev = [
     {include-group = "test"},
 ]
 test = [
-    {include-group= "all_optional_deps"},
-    "psutil",
     "pytest",
     "hypothesis",
     "coverage>=7.13",

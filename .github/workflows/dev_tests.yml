@@ -59,7 +59,7 @@ jobs:
     - name: Install dependencies
       run: |
         . ./.venv/bin/activate
-        pip install -e . --group=test
+        pip install -e .[all]
 
     - name: Run Multicore smoke test
       run: |
