@@ -11,7 +11,7 @@ jobs:
   tests:
     runs-on: ubuntu-26.04
     container:
-      image: ghcr.io/hazardous-area/fiddlesticks/test_env:sha-58c3fdc
+      image: ghcr.io/hazardous-area/fiddlesticks/test_env:sha-f1100e7
       # Extra options needed for Veracrypt to 
       # mount volumes inside a Docker container
       options: >-
