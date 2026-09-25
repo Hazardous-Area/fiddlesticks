@@ -193,7 +193,7 @@ def benchmark_candidate_testing(
 
             t_s = t1 - t0
 
-            per_pwd_ms_per_core = (1000 * t_s * num_cores // total)
+            per_pwd_ms_per_core = 1000 * t_s * num_cores // total
             files[file] = per_pwd_ms_per_core
             output(f"{int(t_s):9}|{per_pwd_ms_per_core:{L - 11}}|")
 
