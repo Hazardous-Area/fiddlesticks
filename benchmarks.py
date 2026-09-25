@@ -172,7 +172,7 @@ def benchmark_candidate_testing(
                 output(f" {total:{len(headers[1]) - 3}} |")
                 printed_num_pwds = True
 
-            if (per_pwd_per_cpu_ms/ 1000) * (total / num_cores) ) >= max_time_s:
+            if (per_pwd_per_cpu_ms / 1000) * (total / num_cores) >= max_time_s:
                 output(f"{' ':9}|{' ':{L - 11}}|")
                 continue
 
