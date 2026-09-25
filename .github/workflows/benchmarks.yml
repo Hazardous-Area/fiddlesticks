@@ -65,7 +65,7 @@ jobs:
     - name: Run Benchmarks
       run: |
         . ./.venv/bin/activate
-        python benchmarks.py --output-file benchmarks.txt --max-time-s=3540 --max-num-subs=6 --num-cores=all
+        python benchmarks.py --output-file benchmarks.txt --max-time-s=3540 --max-num-subs=6 --num-cores=4
 
     - name: Print Benchmark results file
       run: |

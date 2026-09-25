@@ -1,4 +1,5 @@
 import argparse
+import os
 import time
 import tomllib
 from collections import deque
@@ -13,6 +14,7 @@ version = metadata["project"]["version"]
 
 # guess = "abcd"
 guess = "correcthorsebatterystaple"
+num_cpu_cores_available = os.process_cpu_count()
 
 
 def f(x, guess=guess):
@@ -136,7 +138,7 @@ def benchmark_candidate_testing(
     output(f"{msg}\n\n")
 
     # Markdown table format
-    headers = [f" {file.suffix:5}/s | per pwd/ms |" for file in files]
+    headers = [f" {file.suffix:5}/s | per pwd/cpu ms |" for file in files]
     headers.insert(0, "| Num subs |")
     headers.insert(1, "Num pwds |")
     for header in headers:
@@ -184,7 +186,7 @@ def benchmark_candidate_testing(
 
             t_s = t1 - t0
 
-            per_pwd_ms = 1000 * t_s // N
+            per_pwd_ms_per_core = (1000 * t_s // N) // num_cores
             files[file] = per_pwd_ms
             output(f"{int(t_s):9}|{per_pwd_ms:{L - 11}}|")
 
@@ -202,6 +204,7 @@ parser.add_argument("--num-cores", type=int, default=1)
 
 if __name__ == "__main__":
     namespace = parser.parse_args()
+    print(f"Testing: {guess=}  (num_cores = {namespace.num_cores}, {num_cpu_cores_available=}). ")
     benchmark_candidate_testing(**vars(namespace))
 
 # E.g.
