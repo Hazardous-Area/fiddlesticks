@@ -177,18 +177,25 @@ def benchmark_candidate_testing(
                 continue
 
             file_name = file.as_posix()
-            checker_factory = fiddlesticks._default_Checker_selector(file_name)
-            updater = fiddlesticks.Updater()
+            # checker_factory = fiddlesticks._default_Checker_selector(file_name)
+            # updater = fiddlesticks.Updater()
 
             t0 = time.time()
-            fiddlesticks.cli("--new-search",f"--password-guess={guess}",f"--num-cores={num_cores}"file_name)
+            fiddlesticks.cli(
+                [
+                    "--new-search",
+                    f"--password-guess={guess}",
+                    f"--num-cores={num_cores}",
+                    file_name,
+                ]
+            )
             t1 = time.time()
 
             t_s = t1 - t0
 
             per_pwd_ms_per_core = (1000 * t_s // N) // num_cores
-            files[file] = per_pwd_ms
-            output(f"{int(t_s):9}|{per_pwd_ms:{L - 11}}|")
+            files[file] = per_pwd_ms_per_core
+            output(f"{int(t_s):9}|{per_pwd_ms_per_core:{L - 11}}|")
 
         output("\n")
 
@@ -204,7 +211,9 @@ parser.add_argument("--num-cores", type=int, default=1)
 
 if __name__ == "__main__":
     namespace = parser.parse_args()
-    print(f"Testing: {guess=}  (num_cores = {namespace.num_cores}, {num_cpu_cores_available=}). ")
+    print(
+        f"Testing: {guess=}  (num_cores = {namespace.num_cores}, {num_cpu_cores_available=}). "
+    )
     benchmark_candidate_testing(**vars(namespace))
 
 # E.g.
