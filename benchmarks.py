@@ -157,7 +157,7 @@ def benchmark_candidate_testing(
 
         printed_num_pwds = False
 
-        for header, (file, per_pwd_ms_per_core) in zip(headers[2:], files.items()):
+        for header, (file, per_pwd_per_cpu_ms) in zip(headers[2:], files.items()):
             L = len(header)
 
             # For num_subs = 8, caching all candidates requires 8GB,
@@ -172,7 +172,7 @@ def benchmark_candidate_testing(
                 output(f" {total:{len(headers[1]) - 3}} |")
                 printed_num_pwds = True
 
-            if (per_pwd_ms_per_core * (total / num_cores) / 1000) >= max_time_s:
+            if (per_pwd_per_cpu_ms/ 1000) * (total / num_cores) ) >= max_time_s:
                 output(f"{' ':9}|{' ':{L - 11}}|")
                 continue
 
@@ -193,9 +193,9 @@ def benchmark_candidate_testing(
 
             t_s = t1 - t0
 
-            per_pwd_ms_per_core = 1000 * t_s * num_cores // total
-            files[file] = per_pwd_ms_per_core
-            output(f"{int(t_s):9}|{per_pwd_ms_per_core:{L - 11}}|")
+            per_pwd_per_cpu_ms = (1000 * t_s * num_cores) // total
+            files[file] = per_pwd_per_cpu_ms
+            output(f"{int(t_s):9}|{per_pwd_per_cpu_ms:{L - 11}}|")
 
         output("\n")
 
