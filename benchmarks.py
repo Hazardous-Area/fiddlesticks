@@ -124,6 +124,7 @@ def benchmark_candidate_testing(
     output_file: Path = Path("fiddlesticks_benchmarks.txt"),
     max_time_s: int = 1000,
     max_num_subs: int = 3,
+    num_cores: int = 1,
 ):
 
     def output(s: str):
@@ -159,7 +160,7 @@ def benchmark_candidate_testing(
 
             # For num_subs = 8, caching all candidates requires 8GB,
             # so make a new iterator for each file
-            N, pwds = fiddlesticks.candidate_passwords_from_alt_chars(
+            N, _pwds = fiddlesticks.candidate_passwords_from_alt_chars(
                 [guess],
                 min_subs=num_subs,
                 max_subs=num_subs,
@@ -178,10 +179,7 @@ def benchmark_candidate_testing(
             updater = fiddlesticks.Updater()
 
             t0 = time.time()
-            with checker_factory(file_name) as checker:
-                fiddlesticks.check_passwords_sequentially(
-                    pwds, checker, update_every=1000, updater=updater
-                )
+            fiddlesticks.cli("--new-search",f"--password-guess={guess}",f"--num-cores={num_cores}"file_name)
             t1 = time.time()
 
             t_s = t1 - t0
@@ -199,6 +197,7 @@ parser.add_argument(
 )
 parser.add_argument("--max-time-s", type=int, default=1000)
 parser.add_argument("--max-num-subs", type=int, default=3)
+parser.add_argument("--num-cores", type=int, default=1)
 
 
 if __name__ == "__main__":
