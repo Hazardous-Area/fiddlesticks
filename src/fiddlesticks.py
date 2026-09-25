@@ -1059,7 +1059,7 @@ def check_passwords_in_parallel(
 
     for process in processes:
         if process.is_alive():
-            process.join()  # pragma: nocov
+            process.join()  # pragma: no cover
 
     try:
         return found_passwords.get_nowait()

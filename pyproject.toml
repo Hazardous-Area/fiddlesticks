@@ -12,7 +12,7 @@ authors = [
     { name = "James Parrott", email = "james@jamesparrott.dev" }
 ]
 requires-python = ">=3.13"
-version = "0.6.0.dev"
+version = "0.6.0"
 
 dependencies = []
 
