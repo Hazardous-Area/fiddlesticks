@@ -12,7 +12,11 @@ authors = [
     { name = "James Parrott", email = "james@jamesparrott.dev" }
 ]
 requires-python = ">=3.13"
-version = "0.6.0"
+
+# Define the version statically here, not with dynamic=["version"], so that
+# the fiddlesticks.py needn't be copied into the the Docker image in order to
+# install the dependencies and test dependency group
+version = "0.6.1" 
 
 dependencies = []
 

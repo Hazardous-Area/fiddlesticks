@@ -218,18 +218,6 @@ def roundrobin(*iterables):
         yield from map(next, iterators)
 
 
-# def _candidates_from_alts_dict(
-#     guesses_alts: dict[str, dict[int, list[str]]],
-#     first_index: int = 0,
-#     num_subs: int,
-# ) -> Iterator[GuessInfo]:
-#     iterators = (
-#         _candidates_from_num_subs(guess, num_subs, alts)
-#         for guess, alts in guesses_alts.items()
-#     )
-#     yield from roundrobin(iterators)
-
-
 def _roundrobin_all_guesses(
     num_subs: int,
     guesses_alts: dict[str, dict[int, list[str]]],

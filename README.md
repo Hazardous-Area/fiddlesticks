@@ -4,7 +4,7 @@
 ![Tests passing](https://github.com/Hazardous-Area/fiddlesticks/actions/workflows/tests.yml/badge.svg)
 ![Code qual](https://github.com/Hazardous-Area/fiddlesticks/actions/workflows/lint.yml/badge.svg)
 
-Version 0.5.0.dev
+Version 0.6.1
 
 ## Description
 Password recovery tool, for password-encrypted files, using simple off-line brute 
