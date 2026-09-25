@@ -2,19 +2,17 @@ import os
 import queue
 import sys
 from collections.abc import Iterable
-from multiprocessing import Event, Process, Queue
-from multiprocessing.synchronize import Event as EventT
+from multiprocessing import Process, Queue
 from pathlib import Path
 
 from fiddlesticks import (
     Checker,
     MS_OfficeFilesKeyChecker,
     candidate_passwords_from_alt_chars,
-    handle_found_password,
     save_ruled_out_indices_to_progress_file,
 )
 
-type GuessInfo = tuple[int, tuple[str, int]]
+type IndexedGuessInfo = tuple[int, tuple[str, int]]
 
 
 class UnknownCPUCount(Exception):
@@ -35,13 +33,13 @@ def get_cpu_count() -> int:
 class Worker:
     def __init__(
         self,
-        pw_found: EventT,
-        guesses: Queue[GuessInfo],
+        found_passwords: Queue[IndexedGuessInfo],
+        guesses: Queue[IndexedGuessInfo],
         incorrect_guess_indices: Queue[int],
         checker_factory: type[Checker],
         file: Path,
     ):
-        self.pw_found = pw_found
+        self.found_passwords = found_passwords
         self.guesses = guesses
         self.incorrect_guess_indices = incorrect_guess_indices
         self.checker = checker_factory(file=file)
@@ -53,7 +51,7 @@ class Worker:
 
     def get_and_check_next_guess(self) -> bool:
 
-        if self.pw_found.is_set():
+        if not self.found_passwords.empty():
             return False
 
         try:
@@ -64,8 +62,7 @@ class Worker:
         index, (guess, _num_subs) = guess_info
 
         if self.checker(guess):
-            self.pw_found.set()
-            handle_found_password(guess, index, print_passwords=True)
+            self.found_passwords.put(guess_info)
 
             return False
 
@@ -76,16 +73,16 @@ class Worker:
 def parent(
     checker_factory: type[Checker],
     file: Path,
-    guesses: Iterable[GuessInfo],
+    guesses: Iterable[IndexedGuessInfo],
     num_cores: int | None = None,
     min_queue_size=1_000,
     max_queue_size=10_000,
 ):
 
     guesses = iter(guesses)
-    pw_found = Event()
-    queued_guesses: Queue[GuessInfo] = Queue(maxsize=max_queue_size)
+    queued_guesses: Queue[IndexedGuessInfo] = Queue(maxsize=max_queue_size)
     incorrect_guess_indices: Queue[int] = Queue(maxsize=max_queue_size)
+    found_passwords: Queue[IndexedGuessInfo] = Queue(maxsize=1)
 
     if num_cores is None:
         num_cores = get_cpu_count()
@@ -94,14 +91,18 @@ def parent(
     workers = [
         Process(
             target=Worker(
-                pw_found, queued_guesses, incorrect_guess_indices, checker_factory, file
+                found_passwords,
+                queued_guesses,
+                incorrect_guess_indices,
+                checker_factory,
+                file,
             ),
             args=(),
         )
         for _ in range(num_cores - 1)
     ]
     parent_worker = Worker(
-        pw_found, queued_guesses, incorrect_guess_indices, checker_factory, file
+        found_passwords, queued_guesses, incorrect_guess_indices, checker_factory, file
     )
 
     unqueued_candidates = True
@@ -110,7 +111,7 @@ def parent(
         worker.start()
 
     with parent_worker.checker:
-        while not pw_found.is_set():
+        while found_passwords.empty():
             approx_queue_size = queued_guesses.qsize()
             if unqueued_candidates and approx_queue_size <= min_queue_size:
                 # Or while workers not timed out
@@ -135,8 +136,10 @@ def parent(
             if not more_work:
                 break
 
-    if pw_found.is_set():
-        print("Found password!")
+    try:
+        return found_passwords.get_nowait()
+    except queue.Empty:
+        return None
 
 
 def main():
@@ -151,7 +154,7 @@ def main():
     parent(
         checker_factory=MS_OfficeFilesKeyChecker,
         file=xlsx_file,
-        guesses=enumerate(guesses, start=first_index),
+        guesses=guesses,
     )
 
 

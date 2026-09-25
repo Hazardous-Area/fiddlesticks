@@ -137,8 +137,7 @@ def _collate_args(
         optional_args = [shlex.quote(opt_arg) for opt_arg in optional_args]
     return [
         "fiddlesticks",
-        "--max-subs",
-        f"{max_subs}",
+        f"--max-subs={max_subs}",
         *optional_args,
         *args,
     ]
@@ -247,11 +246,22 @@ def test_first_index_with_num_subs_4_default_command_and_docx():
 
 def test_all_cores_with_docx():
     result = subprocess.run(
-        _collate_args(4, ["7357"], DOCX_FILE.as_posix(), "--num-cores", "all"),
+        _collate_args(
+            4, ["7357"], DOCX_FILE.as_posix(), "--min-subs=4", "-vv"
+        ),  # , "--num-cores=all"),
         capture_output=True,
         check=False,
     )
     assert result.returncode == 0
+
+
+def test_bad_guess_with_all_cores_with_docx():
+    result = subprocess.run(
+        _collate_args(4, ["foot"], DOCX_FILE.as_posix(), "--num-cores=all"),
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 1
 
 
 @pytest.mark.parametrize(
@@ -281,9 +291,12 @@ def test_resuming_from_progress_file(file, tmp_path, capsys):
         2, ["te57"], file, tmp_path, "-v", "--resume", new_search=False
     )
     assert max_subs_2_result.returncode == 0
+    assert max_subs_2_result.stderr.splitlines()[3].startswith(
+        b"11/47, num substitutions=2"
+    )
     assert max_subs_2_result.stderr.splitlines()[-1].startswith(
-        b"Found password (candidate index: 32) in "
-    ), max_subs_2_result.stderr
+        b"Found password (candidate index: 43) in "
+    )
     capsys.readouterr()
 
 

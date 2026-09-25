@@ -46,7 +46,7 @@ def test_alt_chars_candidates_generator(
     _total, candidates = fiddlesticks.candidate_passwords_from_alt_chars(
         [pwd], max_subs=M
     )
-    for candidate, _num_subs in candidates:
+    for i, (candidate, _num_subs) in candidates:
         _assert_candidate_within_M_of_pwds(candidate, [pwd], M)
 
 
@@ -61,7 +61,7 @@ def test_multiple_guesses(pwds):
     _total, candidates = fiddlesticks.candidate_passwords_from_alt_chars(
         pwds, max_subs=2
     )
-    for candidate, _num_subs in candidates:
+    for i, (candidate, _num_subs) in candidates:
         _assert_candidate_within_M_of_pwds(candidate, pwds, 2)
 
 
@@ -95,6 +95,8 @@ def test_skipping_in_candidate_passwords_from_alt_chars(
             first_index=0,
         )
     )
+    assert actual_total == expected_total
+
     for _ in range(first_index):
         next(expected_guesses_it)
     i = None
@@ -103,7 +105,6 @@ def test_skipping_in_candidate_passwords_from_alt_chars(
     ):
         assert actual == expected
 
-    assert (actual_total == 0 and i is None) or (i == actual_total - 1)
     assert (expected_total == 0 and i is None) or (
         i == expected_total - 1 - first_index
     )
