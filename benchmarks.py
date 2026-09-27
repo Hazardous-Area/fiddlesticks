@@ -1,4 +1,5 @@
 import argparse
+import os
 import time
 import tomllib
 from collections import deque
@@ -13,6 +14,7 @@ version = metadata["project"]["version"]
 
 # guess = "abcd"
 guess = "correcthorsebatterystaple"
+num_cpu_cores_available = os.process_cpu_count()
 
 
 def f(x, guess=guess):
@@ -124,6 +126,7 @@ def benchmark_candidate_testing(
     output_file: Path = Path("fiddlesticks_benchmarks.txt"),
     max_time_s: int = 1000,
     max_num_subs: int = 3,
+    num_cores: int = 1,
 ):
 
     def output(s: str):
@@ -135,7 +138,7 @@ def benchmark_candidate_testing(
     output(f"{msg}\n\n")
 
     # Markdown table format
-    headers = [f" {file.suffix:5}/s | per pwd/ms |" for file in files]
+    headers = [f" {file.suffix:5}/s | per pwd/cpu ms |" for file in files]
     headers.insert(0, "| Num subs |")
     headers.insert(1, "Num pwds |")
     for header in headers:
@@ -154,41 +157,49 @@ def benchmark_candidate_testing(
 
         printed_num_pwds = False
 
-        for header, (file, per_pwd_ms) in zip(headers[2:], files.items()):
+        for header, (file, per_pwd_per_cpu_ms) in zip(headers[2:], files.items()):
             L = len(header)
 
             # For num_subs = 8, caching all candidates requires 8GB,
             # so make a new iterator for each file
-            N, pwds = fiddlesticks.candidate_passwords_from_alt_chars(
+            total, _pwds = fiddlesticks.candidate_passwords_from_alt_chars(
                 [guess],
                 min_subs=num_subs,
                 max_subs=num_subs,
             )
 
             if not printed_num_pwds:
-                output(f" {N:{len(headers[1]) - 3}} |")
+                output(f" {total:{len(headers[1]) - 3}} |")
                 printed_num_pwds = True
 
-            if (per_pwd_ms * N / 1000) >= max_time_s:
+            if (per_pwd_per_cpu_ms / 1000) * (total / num_cores) >= max_time_s:
                 output(f"{' ':9}|{' ':{L - 11}}|")
                 continue
 
             file_name = file.as_posix()
-            checker_factory = fiddlesticks._default_Checker_selector(file_name)
-            updater = fiddlesticks.Updater()
+            # checker_factory = fiddlesticks._default_Checker_selector(file_name)
+            # updater = fiddlesticks.Updater()
 
             t0 = time.time()
-            with checker_factory(file_name) as checker:
-                fiddlesticks.check_passwords_sequentially(
-                    pwds, checker, update_every=1000, updater=updater
-                )
+            fiddlesticks.cli(
+                [
+                    "--new-search",
+                    f"--password-guess={guess}",
+                    f"--num-cores={num_cores}",
+                    f"--max-subs={num_subs}",
+                    f"--min-subs={num_subs}",
+                    file_name,
+                ]
+            )
             t1 = time.time()
 
             t_s = t1 - t0
 
-            per_pwd_ms = 1000 * t_s // N
-            files[file] = per_pwd_ms
-            output(f"{int(t_s):9}|{per_pwd_ms:{L - 11}}|")
+            per_pwd_per_cpu_ms = (1000 * t_s * num_cores) // total
+            # Update the current value in the dict, with (hopefully)
+            # this better estimate (initialised to zero above).
+            files[file] = per_pwd_per_cpu_ms
+            output(f"{int(t_s):9}|{per_pwd_per_cpu_ms:{L - 11}}|")
 
         output("\n")
 
@@ -199,10 +210,14 @@ parser.add_argument(
 )
 parser.add_argument("--max-time-s", type=int, default=1000)
 parser.add_argument("--max-num-subs", type=int, default=3)
+parser.add_argument("--num-cores", type=int, default=1)
 
 
 if __name__ == "__main__":
     namespace = parser.parse_args()
+    print(
+        f"Testing: {guess=}  (num_cores = {namespace.num_cores}, {num_cpu_cores_available=}). "
+    )
     benchmark_candidate_testing(**vars(namespace))
 
 # E.g.
