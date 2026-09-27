@@ -195,7 +195,7 @@ def benchmark_candidate_testing(
 
             t_s = t1 - t0
 
-            per_pwd_per_cpu_ms = (1000 * t_s * num_cores) // total
+            per_pwd_per_cpu_ms = (1000 * t_s * num_cores) / total
             # Update the current value in the dict, with (hopefully)
             # this better estimate (initialised to zero above).
             files[file] = per_pwd_per_cpu_ms
