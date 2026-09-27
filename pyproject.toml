@@ -54,11 +54,7 @@ all = [
 
 
 [dependency-groups]
-all_optional_deps = [
-        "fiddlesticks[ssh,keepassxc,aegis,py7zr,msoffice]",
-]
 dev = [
-    {include-group= "all_optional_deps"},
     {include-group = "lint"},
     {include-group = "test"},
 ]
