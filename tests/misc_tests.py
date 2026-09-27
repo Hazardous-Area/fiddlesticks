@@ -183,13 +183,26 @@ def test_msoffice_crypto_tools(path: Path):
     office_file.decrypt(stream)
 
 
-def test_offer_to_skip_indices_ruled_out_by_progress_file(tmp_path, capsys):
+def test_offer_to_skip_indices_ruled_out_by_progress_file_y(tmp_path, capsys):
     progress_file, indices = _create_random_progress_file(
         tmp_path / "test_progress_file.json"
     )
 
     with patch("builtins.input", side_effect=["y"]):
         assert indices[0] + 1 == offer_to_skip_indices_ruled_out_by_progress_file(
+            force_resume=False,
+            saved_progress_file=progress_file,
+        )
+    capsys.readouterr()
+
+
+def test_offer_to_skip_indices_ruled_out_by_progress_file_n(tmp_path, capsys):
+    progress_file, _indices = _create_random_progress_file(
+        tmp_path / "test_progress_file.json"
+    )
+
+    with patch("builtins.input", side_effect=["n"]):
+        assert 0 == offer_to_skip_indices_ruled_out_by_progress_file(
             force_resume=False,
             saved_progress_file=progress_file,
         )
