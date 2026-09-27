@@ -2,8 +2,6 @@ name: Dev tests
 
 on:
   workflow_dispatch:
-  push:
-
 
 jobs:
   test:
@@ -61,16 +59,12 @@ jobs:
         . ./.venv/bin/activate
         pip install -e .[all]
 
-    - name: Run Multicore smoke test
-      run: |
-        . ./.venv/bin/activate
-        python dev/sketch_multicore.py
 
     
 
-    # - name: Run PW candidate Generator regression tests (to check refactor)
-    #   run: |
-    #     . ./.venv/bin/activate
-    #     pytest dev/pw_generator_regression_tests.py
+    - name: Run PW candidate Generator regression tests (to check refactor)
+      run: |
+        . ./.venv/bin/activate
+        pytest dev/pw_generator_regression_tests.py
 
 

@@ -54,10 +54,6 @@ all = [
 
 
 [dependency-groups]
-dev = [
-    {include-group = "lint"},
-    {include-group = "test"},
-]
 test = [
     "pytest",
     "hypothesis",
@@ -67,7 +63,6 @@ test = [
 lint = [
     "ruff",
     "ty",
-    "pre-commit",
 ]
 
 
