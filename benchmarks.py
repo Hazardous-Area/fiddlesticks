@@ -108,7 +108,7 @@ def benchmark_candidate_generation(
 
 
 test_files = [
-    ("test.xlsx", "test.docx"),
+    ("test.docx", "test.xlsx"),
     "Test_vault_Do_Not_Use.kdbx",
     "aegis_encrypted.json",
     "foo.7z",
@@ -118,13 +118,14 @@ test_files = [
 
 
 files = {
-    Path(files[0] if isinstance(files, tuple) else files): 0.0 for files in test_files
+    Path(files[0] if isinstance(files, tuple) else files): 0.1 for files in test_files
 }
 
 
 def benchmark_candidate_testing(
     output_file: Path = Path("fiddlesticks_benchmarks.txt"),
     max_time_s: int = 1000,
+    min_num_subs: int = 0,
     max_num_subs: int = 3,
     num_cores: int = 1,
 ):
@@ -150,7 +151,7 @@ def benchmark_candidate_testing(
     output("|".join(f":{'-' * 7}:|:{'-' * 10}:" for header in headers[2:]))
     output("|\n")
 
-    for num_subs in range(min(max_num_subs, len(guess)) + 1):
+    for num_subs in range(min_num_subs, min(max_num_subs, len(guess)) + 1):
         L = len(headers[0])
 
         output(f"|{num_subs:{L - 3}} |")
@@ -172,6 +173,7 @@ def benchmark_candidate_testing(
                 output(f" {total:{len(headers[1]) - 3}} |")
                 printed_num_pwds = True
 
+            # Skip this one, if it's estimated to take longer than max_time_s
             if (per_pwd_per_cpu_ms / 1000) * (total / num_cores) >= max_time_s:
                 output(f"{' ':9}|{' ':{L - 11}}|")
                 continue
@@ -210,6 +212,7 @@ parser.add_argument(
 )
 parser.add_argument("--max-time-s", type=int, default=1000)
 parser.add_argument("--max-num-subs", type=int, default=3)
+parser.add_argument("--min-num-subs", type=int, default=0)
 parser.add_argument("--num-cores", type=int, default=1)
 
 
