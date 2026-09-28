@@ -28,7 +28,7 @@ jobs:
     - name: Run Benchmarks
       run: |
         . /fiddlesticks/.venv/bin/activate
-        python benchmarks.py --output-file benchmarks.txt --max-time-s=5000 --min-num-subs=7 --max-num-subs=7 --num-cores=4
+        python benchmarks.py --output-file benchmarks.txt --max-time-s=3540 --min-num-subs=0 --max-num-subs=6 --num-cores=4
 
     - name: Print Benchmark results file
       run: |

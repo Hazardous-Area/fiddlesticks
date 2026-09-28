@@ -15,6 +15,14 @@
 |        6 | 3658692 |     1639|             1.0|     1622|             1.0|     1621|             1.0|     1610|             1.0|     1623|             1.0|     1617|             1.0|
 
 
+ - Github Actions Ubuntu runner (4 core)
+ - fiddlesticks v0.6.1
+ - guess='correcthorsebatterystaple'
+
+| Num subs |Num pwds | .docx/s | per pwd/cpu ms |
+|----------|:-------:|:-------:|:----------:|
+|        7 | 16123752 |     5199|1.2898232823581652|
+
 
  - Hetzner CX23 x86 4GB
  - fiddlesticks v0.5.0.dev

@@ -109,11 +109,11 @@ def benchmark_candidate_generation(
 
 test_files = [
     ("test.docx", "test.xlsx"),
-    # "Test_vault_Do_Not_Use.kdbx",
-    # "aegis_encrypted.json",
-    # "foo.7z",
-    # ("openssh-modern.key", "basic_PEM.key", "openssl_PEM.key"),
-    # "test.hc",
+    "Test_vault_Do_Not_Use.kdbx",
+    "aegis_encrypted.json",
+    "foo.7z",
+    ("openssh-modern.key", "basic_PEM.key", "openssl_PEM.key"),
+    "test.hc",
 ]
 
 
