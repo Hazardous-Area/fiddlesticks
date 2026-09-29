@@ -291,7 +291,7 @@ subparsers = parser.add_subparsers(
 
 
 def add_subparser(name: str, func):
-    subparser = subparsers.add_parser(name)
+    subparser = subparsers.add_parser(name, parents=[parser])
     subparser.set_defaults(func=func)
     return subparser
 
