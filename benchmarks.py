@@ -158,7 +158,7 @@ def benchmark_candidate_testing(
 
         printed_num_pwds = False
 
-        for header, (file, per_pwd_per_cpu_ms) in zip(headers[2:], files.items()):
+        for header, (file, cpu_ms_per_pwd) in zip(headers[2:], files.items()):
             L = len(header)
 
             # For num_subs = 8, caching all candidates requires 8GB,
@@ -174,7 +174,7 @@ def benchmark_candidate_testing(
                 printed_num_pwds = True
 
             # Skip this one, if it's estimated to take longer than max_time_s
-            if (per_pwd_per_cpu_ms / 1000) * (total / num_cores) >= max_time_s:
+            if (cpu_ms_per_pwd / 1000) * (total / num_cores) >= max_time_s:
                 output(f"{' ':9}|{' ':{L - 11}}|")
                 continue
 
@@ -197,11 +197,13 @@ def benchmark_candidate_testing(
 
             t_s = t1 - t0
 
-            per_pwd_per_cpu_ms = (1000 * t_s * num_cores) / total
+            total_cpu_ms = 1000 * t_s * num_cores
+
+            cpu_ms_per_pwd = total_cpu_ms / total
             # Update the current value in the dict, with (hopefully)
             # this better estimate (initialised to zero above).
-            files[file] = per_pwd_per_cpu_ms
-            output(f"{int(t_s):9}|{per_pwd_per_cpu_ms:{L - 11}.3f}|")
+            files[file] = cpu_ms_per_pwd
+            output(f"{int(t_s):9}|{cpu_ms_per_pwd:{L - 11}.3f}|")
 
         output("\n")
 
@@ -244,7 +246,7 @@ def benchmark_checkers(
 
     output(f" {total:{len(headers[1]) - 3}} |")
 
-    for header, (file, _per_pwd_per_cpu_ms) in zip(headers[2:], files.items()):
+    for header, (file, _cpu_ms_per_pwd) in zip(headers[2:], files.items()):
         L = len(header)
 
         t0 = time.time()
