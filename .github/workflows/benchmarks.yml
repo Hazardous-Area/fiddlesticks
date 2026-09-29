@@ -25,11 +25,22 @@ jobs:
         . /fiddlesticks/.venv/bin/activate
         pip install -e .[all]   
 
+    - name: Run Checker Benchmarks
+      run: |
+        . /fiddlesticks/.venv/bin/activate
+        python benchmarks.py --output-file checker_benchmarks.txt
+
+    - name: Print Benchmark results file
+      run: |
+        cat checker_benchmarks.txt
+
     - name: Run Benchmarks
+      if: false
       run: |
         . /fiddlesticks/.venv/bin/activate
         python benchmarks.py --output-file benchmarks.txt --max-time-s=3540 --min-num-subs=0 --max-num-subs=6 --num-cores=4
 
     - name: Print Benchmark results file
+      if: false
       run: |
         cat benchmarks.txt

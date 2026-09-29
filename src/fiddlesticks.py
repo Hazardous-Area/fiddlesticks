@@ -429,7 +429,7 @@ type CheckerFactoryT = (
 
 
 class Py7zrChecker(Checker):
-    def __init__(self, archive: str, extract_to: str | None = None, **kwargs):
+    def __init__(self, file: str, extract_to: str | None = None, **kwargs):
         from _lzma import LZMAError
 
         from py7zr import SevenZipFile
@@ -439,11 +439,11 @@ class Py7zrChecker(Checker):
         self.exceptions = (PasswordRequired, Bad7zFile, LZMAError)
 
         self.extract_to = (
-            str(_make_new_tmp_sub_dir_for_7z(archive))
+            str(_make_new_tmp_sub_dir_for_7z(file))
             if extract_to is None
             else extract_to
         )
-        self.stream = io.BytesIO(Path(archive).read_bytes())
+        self.stream = io.BytesIO(Path(file).read_bytes())
 
     def __call__(self, candidate: str) -> bool:
         self.stream.seek(0)

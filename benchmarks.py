@@ -201,9 +201,76 @@ def benchmark_candidate_testing(
             # Update the current value in the dict, with (hopefully)
             # this better estimate (initialised to zero above).
             files[file] = per_pwd_per_cpu_ms
-            output(f"{int(t_s):9}|{per_pwd_per_cpu_ms:{L - 11}}|")
+            output(f"{int(t_s):9}|{per_pwd_per_cpu_ms:{L - 11}.3f}|")
 
         output("\n")
+
+
+def benchmark_checkers(
+    output_file: Path = Path("checker_benchmarks.txt"),
+    **kwargs,
+):
+
+    def output(s: str):
+        with open(output_file, "at") as f:
+            f.write(s)
+
+    guess_range = range(123, 144)
+    msg = f"## Checker benchmarks\n - fiddlesticks v{version}\n - password{guess_range.start}...{guess_range.stop - 1}"
+    print(msg)
+    output(f"{msg}\n\n")
+
+    # Markdown table format
+    headers = [f" {file.suffix:5}/s | per pwd/cpu ms |" for file in files]
+    headers.insert(0, "|          |")
+    headers.insert(1, "Num pwds |")
+    for header in headers:
+        output(header)
+
+    # Delimiter row
+    output(f"\n|{'-' * (len(headers[0]) - 2)}|")
+    output(f":{'-' * (len(headers[1]) - 3)}:|")
+    output("|".join(f":{'-' * 7}:|:{'-' * 10}:" for header in headers[2:]))
+    output("|\n")
+
+    L = len(headers[0])
+
+    output(f"|{' ' * (L - 2)}|")
+
+    total = len(guess_range)
+
+    output(f" {total:{len(headers[1]) - 3}} |")
+
+    for header, (file, _per_pwd_per_cpu_ms) in zip(headers[2:], files.items()):
+        L = len(header)
+
+        t0 = time.time()
+        guesses = [f"password{i}" for i in guess_range]
+        last_guess = guesses.pop()
+        guesses_it = iter(guesses)
+
+        file_name = file.as_posix()
+        checker_factory = fiddlesticks._default_Checker_selector(file_name)
+
+        with checker_factory(file=file_name) as checker:
+            checker(next(guesses_it))
+            _t1 = time.time()
+
+            for guess in guesses_it:
+                checker(guess)
+
+            t2 = time.time()
+
+            checker(last_guess)
+
+            t3 = time.time()
+
+        t_inc_overhead_ms = 1000 * (t3 - t0)
+        t_per_check_ms = (1000 * (t3 - t2)) / total
+
+        output(f"{int(t_inc_overhead_ms):9}|{t_per_check_ms:{L - 11}.3f}|")
+
+    output("\n")
 
 
 parser = argparse.ArgumentParser()
@@ -218,10 +285,11 @@ parser.add_argument("--num-cores", type=int, default=1)
 
 if __name__ == "__main__":
     namespace = parser.parse_args()
-    print(
-        f"Testing: {guess=}  (num_cores = {namespace.num_cores}, {num_cpu_cores_available=}). "
-    )
-    benchmark_candidate_testing(**vars(namespace))
+    # print(
+    #     f"Testing: {guess=}  (num_cores = {namespace.num_cores}, {num_cpu_cores_available=}). "
+    # )
+    # benchmark_candidate_testing(**vars(namespace))
+    benchmark_checkers(output_file=namespace.output_file)
 
 # E.g.
 # fiddlesticks_benchmarks.txt
