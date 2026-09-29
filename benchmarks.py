@@ -274,7 +274,7 @@ def benchmark_checkers(
         t_inc_overhead_ms = 1000 * (t3 - t0)
         delta_t_per_check_ms = (1000 * (t3 - t2)) / total
 
-        output(f"{int(t_inc_overhead_ms):9}|{delta_t_per_check_ms:{L - 11}.3f}|")
+        output(f"{t_inc_overhead_ms:9.2f}|{delta_t_per_check_ms:{L - 11}.3f}|")
 
     output("\n")
 
