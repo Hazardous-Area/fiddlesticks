@@ -285,9 +285,7 @@ parser.add_argument(
 )
 parser.add_argument("--max-num-subs", type=int, default=3)
 
-subparsers = parser.add_subparsers(
-    required=True, help="Options specific to each benchmark. "
-)
+subparsers = parser.add_subparsers(required=True)
 
 
 def add_subparser(name: str, func):
