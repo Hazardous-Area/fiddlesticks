@@ -28,7 +28,7 @@ jobs:
     - name: Run Checker Benchmarks
       run: |
         . /fiddlesticks/.venv/bin/activate
-        python benchmarks.py --output-file checker_benchmarks.txt
+        python benchmarks.py checker --output-file checker_benchmarks.txt
 
     - name: Print Benchmark results file
       run: |
@@ -38,7 +38,7 @@ jobs:
       if: true
       run: |
         . /fiddlesticks/.venv/bin/activate
-        python benchmarks.py --output-file benchmarks.txt --max-time-s=3540 --min-num-subs=0 --max-num-subs=4 --num-cores=3
+        python benchmarks.py end_to_end --output-file benchmarks.txt --max-time-s=3540 --min-num-subs=0 --max-num-subs=4 --num-cores=3
 
     - name: Print Benchmark results file
       if: true

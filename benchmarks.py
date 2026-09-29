@@ -28,6 +28,7 @@ def f(x, guess=guess):
 def benchmark_candidate_generation(
     max_num_subs: int = 8,
     iterate: bool = False,
+    **kwargs,
 ):
     queue = deque(maxlen=1000)
     for i in range(min(max_num_subs, len(guess)) + 1):
@@ -271,9 +272,9 @@ def benchmark_checkers(
             t3 = time.time()
 
         t_inc_overhead_ms = 1000 * (t3 - t0)
-        t_per_check_ms = (1000 * (t3 - t2)) / total
+        delta_t_per_check_ms = (1000 * (t3 - t2)) / total
 
-        output(f"{int(t_inc_overhead_ms):9}|{t_per_check_ms:{L - 11}.3f}|")
+        output(f"{int(t_inc_overhead_ms):9}|{delta_t_per_check_ms:{L - 11}.3f}|")
 
     output("\n")
 
@@ -282,11 +283,22 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--output-file", type=Path, default=Path("fiddlesticks_benchmarks.txt")
 )
-parser.add_argument("--max-time-s", type=int, default=1000)
 parser.add_argument("--max-num-subs", type=int, default=3)
-parser.add_argument("--min-num-subs", type=int, default=0)
-parser.add_argument("--num-cores", type=int, default=1)
 
+subparsers = parser.add_subparsers(required=True,help='Options specific to each benchmark. ')
+def add_subparser(name: str, func):
+    subparser = subparsers.add_parser(name)
+    subparser.setdefaults(func=func)
+    return subparser
+generator_parser = add_subparser("generator", benchmark_candidate_generation)
+end_to_end_parser("end_to_end", benchmark_candidate_testing)
+add_subparser("checker", benchmark_checkers)
+
+generator_parser.add_argument("--iterate", type=bool, default=False)
+
+end_to_end_parser.add_argument("--max-time-s", type=int, default=1000)
+end_to_end_parser.add_argument("--min-num-subs", type=int, default=0)
+end_to_end_parser.add_argument("--num-cores", type=int, default=1)
 
 if __name__ == "__main__":
     namespace = parser.parse_args()
@@ -294,7 +306,7 @@ if __name__ == "__main__":
     #     f"Testing: {guess=}  (num_cores = {namespace.num_cores}, {num_cpu_cores_available=}). "
     # )
     # benchmark_candidate_testing(**vars(namespace))
-    benchmark_checkers(output_file=namespace.output_file)
+    namespace.func(output_file=namespace.output_file)
 
 # E.g.
 # fiddlesticks_benchmarks.txt
