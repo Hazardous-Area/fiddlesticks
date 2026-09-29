@@ -215,8 +215,11 @@ def benchmark_checkers(
         with open(output_file, "at") as f:
             f.write(s)
 
+    start = 123
+    N = 200
+    stop = start + N
     guess_range = range(123, 144)
-    msg = f"## Checker benchmarks\n - fiddlesticks v{version}\n - password{guess_range.start}...{guess_range.stop - 1}"
+    msg = f"## Checker benchmarks\n - fiddlesticks v{version}\n - password{start}...{stop - 1}"
     print(msg)
     output(f"{msg}\n\n")
 
