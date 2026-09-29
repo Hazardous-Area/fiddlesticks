@@ -35,12 +35,12 @@ jobs:
         cat checker_benchmarks.txt
 
     - name: Run Benchmarks
-      if: false
+      if: true
       run: |
         . /fiddlesticks/.venv/bin/activate
-        python benchmarks.py --output-file benchmarks.txt --max-time-s=3540 --min-num-subs=0 --max-num-subs=6 --num-cores=4
+        python benchmarks.py --output-file benchmarks.txt --max-time-s=3540 --min-num-subs=0 --max-num-subs=4 --num-cores=3
 
     - name: Print Benchmark results file
-      if: false
+      if: true
       run: |
         cat benchmarks.txt
