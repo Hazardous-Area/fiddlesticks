@@ -285,14 +285,20 @@ parser.add_argument(
 )
 parser.add_argument("--max-num-subs", type=int, default=3)
 
-subparsers = parser.add_subparsers(required=True,help='Options specific to each benchmark. ')
+subparsers = parser.add_subparsers(
+    required=True, help="Options specific to each benchmark. "
+)
+
+
 def add_subparser(name: str, func):
     subparser = subparsers.add_parser(name)
-    subparser.setdefaults(func=func)
+    subparser.set_defaults(func=func)
     return subparser
+
+
 generator_parser = add_subparser("generator", benchmark_candidate_generation)
-end_to_end_parser("end_to_end", benchmark_candidate_testing)
-add_subparser("checker", benchmark_checkers)
+end_to_end_parser = add_subparser("end_to_end", benchmark_candidate_testing)
+_checker_parser = add_subparser("checker", benchmark_checkers)
 
 generator_parser.add_argument("--iterate", type=bool, default=False)
 
