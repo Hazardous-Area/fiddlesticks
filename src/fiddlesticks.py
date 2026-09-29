@@ -1211,7 +1211,7 @@ parser.set_defaults(
 )
 
 
-def add_mutex_group(
+def _add_mutex_group(
     title: str | None = None,
     description: str | None = None,
     required: bool = False,
@@ -1221,7 +1221,7 @@ def add_mutex_group(
     return mutex_arg_group
 
 
-command_args_group = add_mutex_group(
+command_args_group = _add_mutex_group(
     "Sub-command",
     (
         "The sub-commmand (if any), e.g. the Password checker to use to test candidates. "
@@ -1266,7 +1266,7 @@ add_command_arg("--msoffice", MS_OfficeFilesKeyChecker)
 add_command_arg("--veracrypt", VeracryptChecker)
 
 
-alt_char_map_group = add_mutex_group(
+alt_char_map_group = _add_mutex_group(
     "Character map",
     (
         "The mapping for alternative characters, "

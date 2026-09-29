@@ -279,30 +279,34 @@ def benchmark_checkers(
     output("\n")
 
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(prog="benchmarks.py")
+parser.suggest_on_error = True  # type: ignore
 parser.add_argument(
     "--output-file", type=Path, default=Path("fiddlesticks_benchmarks.txt")
 )
 parser.add_argument("--max-num-subs", type=int, default=3)
+parser.add_argument("--iterate", type=bool, default=False)
+parser.add_argument("--max-time-s", type=int, default=1000)
+parser.add_argument("--min-num-subs", type=int, default=0)
+parser.add_argument("--num-cores", type=int, default=1)
 
-subparsers = parser.add_subparsers(required=True)
+arg_group = parser.add_argument_group(title="Specific benchmarks")
+command_args_group = arg_group.add_mutually_exclusive_group(required=True)
 
 
-def add_subparser(name: str, func):
-    subparser = subparsers.add_parser(name, parents=[parser])
-    subparser.set_defaults(func=func)
-    return subparser
+def add_command_arg(name, command, help: str | None = None):
+    command_args_group.add_argument(
+        name,
+        dest="command",
+        action="store_const",
+        const=command,
+        help=help,
+    )
 
 
-generator_parser = add_subparser("generator", benchmark_candidate_generation)
-end_to_end_parser = add_subparser("end_to_end", benchmark_candidate_testing)
-_checker_parser = add_subparser("checker", benchmark_checkers)
-
-generator_parser.add_argument("--iterate", type=bool, default=False)
-
-end_to_end_parser.add_argument("--max-time-s", type=int, default=1000)
-end_to_end_parser.add_argument("--min-num-subs", type=int, default=0)
-end_to_end_parser.add_argument("--num-cores", type=int, default=1)
+add_command_arg("--generator", benchmark_candidate_generation)
+add_command_arg("--end_to_end", benchmark_candidate_testing)
+add_command_arg("--checker", benchmark_checkers)
 
 if __name__ == "__main__":
     namespace = parser.parse_args()
@@ -310,7 +314,7 @@ if __name__ == "__main__":
     #     f"Testing: {guess=}  (num_cores = {namespace.num_cores}, {num_cpu_cores_available=}). "
     # )
     # benchmark_candidate_testing(**vars(namespace))
-    namespace.func(output_file=namespace.output_file)
+    namespace.command(output_file=namespace.output_file)
 
 # E.g.
 # fiddlesticks_benchmarks.txt

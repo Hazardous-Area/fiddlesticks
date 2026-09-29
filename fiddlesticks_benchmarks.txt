@@ -1,0 +1,7 @@
+## Checker benchmarks
+ - fiddlesticks v0.6.1
+ - password123...322
+
+|          |Num pwds | .docx/s | per pwd/cpu ms | .kdbx/s | per pwd/cpu ms | .json/s | per pwd/cpu ms | .7z  /s | per pwd/cpu ms | .key /s | per pwd/cpu ms | .hc  /s | per pwd/cpu ms |
+|----------|:-------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|:-------:|:----------:|
+|          |      21 |
