@@ -92,7 +92,7 @@ def test_sequential_passwords_checker_verbosity_2(capsys):
         checker_maker=dummy_checker_maker,
         update_every=1,
         updater=UserUpdatePrinter(verbosity=2, total=3, print_passwords=True),
-        progress_saver=ProgressSaver(new_search=True),
+        progress_updater=ProgressSaver(new_search=True),
     )
     capsys.readouterr()
     assert result is None
@@ -110,7 +110,7 @@ def test_sequential_passwords_warns_on_multiple_cores(capsys):
             checker_maker=dummy_checker_maker,
             update_every=1,
             updater=UserUpdatePrinter(),
-            progress_saver=ProgressSaver(new_search=True),
+            progress_updater=ProgressSaver(new_search=True),
             num_cores=2,
         )
     capsys.readouterr()

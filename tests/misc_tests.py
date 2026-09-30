@@ -265,13 +265,17 @@ def test_ProgressSaver_first_index_calc(args: tuple[list[int], int]):
     with contextlib.redirect_stderr(stream), tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
         progress_file = tmp_path / "test_progress_file.json"
-        progress_saver_writer = ProgressSaver(progress_file=progress_file, new_search=True)
+        progress_saver_writer = ProgressSaver(
+            progress_file=progress_file, new_search=True
+        )
         progress_saver_writer.update_progress(untrimmed_indices)
         trimmed_indices = json.loads(progress_file.read_text())[
             "ruled_out_candidates_indices"
         ]
         del progress_saver_writer
-        progress_saver_reader = ProgressSaver(progress_file=progress_file, force_resume=True)
+        progress_saver_reader = ProgressSaver(
+            progress_file=progress_file, force_resume=True
+        )
         starting_index = progress_saver_reader.first_index
 
     assert smallest_after_trimming == trimmed_indices[0]

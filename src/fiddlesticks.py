@@ -40,7 +40,7 @@ from dataclasses import dataclass
 from itertools import combinations, cycle, islice, product
 from multiprocessing import Process, Queue
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 process_time_ref_s = time.process_time()
 TMP_DIR = (
@@ -48,6 +48,7 @@ TMP_DIR = (
 )  # Tests set an env var which gettempdir searches
 TMP_DIR.mkdir(exist_ok=True)
 DEFAULT_PROGRESS_FILE = TMP_DIR / "fiddlesticks_progress.json"
+DEFAULT_TIMINGS_FILE = TMP_DIR / "fiddlesticks_timings.json"
 IS_WINDOWS = sys.platform == "win32"
 type FileT = str | Path
 type GuessInfo = tuple[str, int]
@@ -791,6 +792,10 @@ class VeracryptChecker(SubprocessChecker):
         self.temp_dir.cleanup()
 
 
+class ProgressUpdater(Protocol):
+    def update_progress(self, indices: list[int]) -> list[int]: ...
+
+
 @dataclass
 class ProgressSaver:
     new_search: bool = False
@@ -806,9 +811,6 @@ class ProgressSaver:
             else:
                 self.first_index = 0
 
-
-
-
         if self.progress_file.is_file():
             if not self.new_search and self.first_index is None:
                 self.first_index = self.try_to_resume()
@@ -816,7 +818,7 @@ class ProgressSaver:
                 # Either a first index is specified, or a new search is forced
                 # so any previous progress must be reset.
                 self.progress_file.unlink()
-        
+
         if self.first_index is None:
             self.first_index = 0
 
@@ -890,6 +892,21 @@ class ProgressSaver:
 
 
 @dataclass
+class ProgressTimer:
+    _last_process_time: float = time.process_time()
+    progress_timings_file: Path = DEFAULT_TIMINGS_FILE
+
+    def update_progress(self, indices: list[int]) -> list[int]:
+        t = time.process_time()
+        timings = json.loads(self.progress_timings_file.read_text())
+        timings.append((t - self._last_process_time, len(indices)))
+        self.progress_timings_file.write_text(json.dumps(timings))
+
+        self._last_process_time = t
+        return []
+
+
+@dataclass
 class UserUpdatePrinter:
     verbosity: int = 0
     total: int | None = None
@@ -934,7 +951,7 @@ def check_passwords_sequentially(
     *extras: str,
     update_every: int,
     updater: UserUpdatePrinter,
-    progress_saver: ProgressSaver,
+    progress_updater: ProgressUpdater,
     num_cores: int = 0,
     **kwargs,
 ) -> IndexedGuessInfo | None:
@@ -951,7 +968,7 @@ def check_passwords_sequentially(
             if checker(candidate):
                 return indexed_candidate_info
 
-            progress_saver.update_progress([i])
+            progress_updater.update_progress([i])
 
             if i % update_every == 0:
                 updater.update(indexed_candidate_info)
@@ -1001,7 +1018,7 @@ def check_passwords_in_parallel(
     *extras: str,
     update_every: int,
     updater: UserUpdatePrinter,
-    progress_saver: ProgressSaver,
+    progress_updater: ProgressUpdater,
     num_cores: int = 1,
     total: int | None = None,
     min_queue_size: int = 1_000,
@@ -1069,7 +1086,7 @@ def check_passwords_in_parallel(
                 indices.append(i)
                 updater.update(indexed_guess_info)
 
-            progress_saver.update_progress(indices)
+            progress_updater.update_progress(indices)
 
             if parent_worker.quit and not any(
                 process.is_alive() for process in processes
@@ -1455,6 +1472,11 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         verbosity=ns.verbosity, total=total, print_passwords=ns.print_passwords
     )
 
+    if ns.estimate:
+        progress_updater = ProgressTimer()
+    else:
+        progress_updater = progress_saver
+
     t0 = time.time()
 
     result = main_search_function(
@@ -1465,7 +1487,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         total=total,
         update_every=update_every,
         updater=updater,
-        progress_saver=progress_saver,
+        progress_updater=progress_updater,
         **kwargs,
     )
 
