@@ -806,6 +806,9 @@ class ProgressSaver:
                 # Either a first index is specified, or a new search is forced
                 # so any previous progress must be reset.
                 self.progress_file.unlink()
+        
+        if self.first_index is None:
+            self.first_index = 0
 
     def update_progress(
         self,
