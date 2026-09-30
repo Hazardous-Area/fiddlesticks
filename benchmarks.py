@@ -181,7 +181,7 @@ def benchmark_candidate_testing(
 
             file_name = file.as_posix()
             # checker_factory = fiddlesticks._default_Checker_selector(file_name)
-            # updater = fiddlesticks.Updater()
+            # updater = fiddlesticks.UserUpdatePrinter()
 
             t0 = time.time()
             fiddlesticks.cli(

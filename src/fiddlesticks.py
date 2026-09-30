@@ -42,6 +42,7 @@ from multiprocessing import Process, Queue
 from pathlib import Path
 from typing import Any, cast
 
+process_time_ref_s = time.process_time()
 TMP_DIR = (
     Path(tempfile.gettempdir()) / "fiddlesticks"
 )  # Tests set an env var which gettempdir searches
@@ -790,74 +791,93 @@ class VeracryptChecker(SubprocessChecker):
         self.temp_dir.cleanup()
 
 
-def save_ruled_out_indices_to_progress_file(
-    indices: list[int],
-    saved_progress_file: Path = DEFAULT_PROGRESS_FILE,
-) -> list[int]:
-    saved_indices: list[int]
-    if saved_progress_file.is_file():
-        saved_indices = json.loads(saved_progress_file.read_text())[
-            "ruled_out_candidates_indices"
-        ]
-    else:
-        saved_indices = []
+@dataclass
+class ProgressSaver:
+    new_search: bool = False
+    force_resume: bool = False
+    first_index: int | None = None
+    progress_file: Path = DEFAULT_PROGRESS_FILE
 
-    saved_indices.extend(indices)
-    saved_indices.sort()
+    def __post_init__(self, *args, **kwargs):
+        if self.progress_file.is_file():
+            if not self.new_search and self.first_index is None:
+                self.first_index = self.try_to_resume()
+            else:
+                # Either a first index is specified, or a new search is forced
+                # so any previous progress must be reset.
+                self.progress_file.unlink()
 
-    # Drop any initial sequence of consecutive indices
-    # (we assume all consecutive ones below the lowest saved one
-    #  have all been rules out)
-    i = 0
-    while i + 1 < len(saved_indices) and saved_indices[i + 1] <= saved_indices[i] + 1:
-        i += 1
-    del saved_indices[:i]
+    def update_progress(
+        self,
+        indices: list[int],
+    ) -> list[int]:
+        saved_indices: list[int]
+        if self.progress_file.is_file():
+            saved_progress = json.loads(self.progress_file.read_text())
+            saved_indices = saved_progress["ruled_out_candidates_indices"]
+        else:
+            saved_indices = []
 
-    saved_progress_file.write_text(
-        json.dumps({"ruled_out_candidates_indices": saved_indices})
-    )
+        saved_indices.extend(indices)
+        saved_indices.sort()
 
-    return saved_indices
-
-
-def offer_to_skip_indices_ruled_out_by_progress_file(
-    force_resume: bool = False,
-    saved_progress_file: Path = DEFAULT_PROGRESS_FILE,
-) -> int:
-    resume_from = None
-    progress_text = saved_progress_file.read_text()
-
-    # Clear previous session's progress.  We've done all we can with it now.
-    saved_progress_file.unlink()
-    try:
-        progress_dict = json.loads(progress_text)
-        ruled_out = sorted(progress_dict["ruled_out_candidates_indices"])
-        # Could search through ruled_out
-        # to find the lowest index that's not ruled out (that's higher
-        # than the lowest one that is).
-        resume_from = ruled_out[0] + 1
-    except (json.decoder.JSONDecodeError, KeyError, IndexError, TypeError):
-        pass
-    if resume_from is not None:
-        print_to_stderr(f"Found previous progress in {saved_progress_file}. ")
-        if (
-            force_resume
-            or input(
-                f"Start from index {resume_from} read from this file? (y/n) "
-            ).lower()
-            == "y"
+        # Drop any initial sequence of consecutive indices
+        # (we assume all consecutive ones below the lowest saved one
+        #  have all been rules out)
+        i = 0
+        while (
+            i + 1 < len(saved_indices) and saved_indices[i + 1] <= saved_indices[i] + 1
         ):
-            # Reset saved progress (our approach does not actually skip indices
-            # other than those before the first saved ruled out one, so all
-            # subsequent ruled out indices are dropped, costing a little
-            # extra repeated computation.
-            save_ruled_out_indices_to_progress_file([ruled_out[0]], saved_progress_file)
-            return resume_from
-    return 0
+            i += 1
+        del saved_indices[:i]
+
+        self.progress_file.write_text(
+            json.dumps(
+                {
+                    "ruled_out_candidates_indices": saved_indices,
+                }
+            )
+        )
+
+        return saved_indices
+
+    def try_to_resume(
+        self,
+    ) -> int:
+        resume_from = None
+        progress_text = self.progress_file.read_text()
+
+        # Clear previous session's progress.  We've done all we can with it now.
+        self.progress_file.unlink()
+        try:
+            progress_dict = json.loads(progress_text)
+            ruled_out = sorted(progress_dict["ruled_out_candidates_indices"])
+            # Could search through ruled_out
+            # to find the lowest index that's not ruled out (that's higher
+            # than the lowest one that is).
+            resume_from = ruled_out[0] + 1
+        except (json.decoder.JSONDecodeError, KeyError, IndexError, TypeError):
+            pass
+        if resume_from is not None:
+            print_to_stderr(f"Found previous progress in {self.progress_file}. ")
+            if (
+                self.force_resume
+                or input(
+                    f"Start from index {resume_from} read from this file? (y/n) "
+                ).lower()
+                == "y"
+            ):
+                # Reset saved progress (our approach does not actually skip indices
+                # other than those before the first saved ruled out one, so all
+                # subsequent ruled out indices are dropped, costing a little
+                # extra repeated computation.
+                self.update_progress([ruled_out[0]])
+                return resume_from
+        return 0
 
 
 @dataclass
-class Updater:
+class UserUpdatePrinter:
     verbosity: int = 0
     total: int | None = None
     print_passwords: bool = False
@@ -900,9 +920,9 @@ def check_passwords_sequentially(
     checker_maker: CheckerFactoryT,
     *extras: str,
     update_every: int,
-    updater: Updater,
+    updater: UserUpdatePrinter,
+    progress_saver: ProgressSaver,
     num_cores: int = 0,
-    first_index: int = 0,
     **kwargs,
 ) -> IndexedGuessInfo | None:
 
@@ -918,7 +938,7 @@ def check_passwords_sequentially(
             if checker(candidate):
                 return indexed_candidate_info
 
-            save_ruled_out_indices_to_progress_file([i])
+            progress_saver.update_progress([i])
 
             if i % update_every == 0:
                 updater.update(indexed_candidate_info)
@@ -967,9 +987,9 @@ def check_passwords_in_parallel(
     checker_maker: CheckerFactoryT,
     *extras: str,
     update_every: int,
-    updater: Updater,
+    updater: UserUpdatePrinter,
+    progress_saver: ProgressSaver,
     num_cores: int = 1,
-    first_index: int = 0,
     total: int | None = None,
     min_queue_size: int = 1_000,
     max_queue_size: int = 10_000,
@@ -1036,7 +1056,7 @@ def check_passwords_in_parallel(
                 indices.append(i)
                 updater.update(indexed_guess_info)
 
-            save_ruled_out_indices_to_progress_file(indices)
+            progress_saver.update_progress(indices)
 
             if parent_worker.quit and not any(
                 process.is_alive() for process in processes
@@ -1086,6 +1106,15 @@ def _default_Checker_selector(*args: str):
 
 parser = argparse.ArgumentParser(prog="fiddlesticks")
 parser.suggest_on_error = True  # type: ignore
+parser.add_argument(
+    "--estimate",
+    action="store_true",
+    help=(
+        "Do a short dry run, "
+        "to estimate the time needed for a real full search "
+        "(assuming the worst case scenario - no password found). "
+    ),
+)
 parser.add_argument(
     "--new-search",
     action="store_true",
@@ -1221,6 +1250,15 @@ def _add_mutex_group(
     return mutex_arg_group
 
 
+control_args_group = _add_mutex_group(
+    "Control options",
+    (
+        "Determine whether to resume a previous search, "
+        "force a new search from scratch, "
+        "or calculate a time estimate. "
+    ),
+)
+
 command_args_group = _add_mutex_group(
     "Sub-command",
     (
@@ -1266,22 +1304,19 @@ add_command_arg("--msoffice", MS_OfficeFilesKeyChecker)
 add_command_arg("--veracrypt", VeracryptChecker)
 
 
-alt_char_map_group = _add_mutex_group(
-    "Character map",
-    (
-        "The mapping for alternative characters, "
-        "to be used to generate candidate passwords from. "
-    ),
+pw_generator_group = _add_mutex_group(
+    "PW candidate generators ",
+    ("The method used to generate candidate passwords. "),
 )
 
-alt_char_map_group.add_argument(
+pw_generator_group.add_argument(
     "--shift_and_leet",
     dest="alt_char_map",
     action="store_const",
     const=SHIFT_AND_LEET_BI_MAP,
 )
 
-alt_char_map_group.add_argument(
+pw_generator_group.add_argument(
     "--char-map",
     type=Path,
     help=(
@@ -1341,9 +1376,6 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
             password_guesses.append(password_guess)
 
     extras = kwargs.pop("extras")
-    new_search = kwargs.pop("new_search")
-    force_resume = kwargs.pop("resume")
-    first_index: int | None = kwargs.pop("first_index")
     update_every = kwargs.pop("update_every")
     num_cores_str = kwargs.pop("num_cores")
     if num_cores_str.strip().lower() == "all":
@@ -1355,15 +1387,6 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         main_search_function = check_passwords_sequentially
     else:
         main_search_function = check_passwords_in_parallel
-
-    if DEFAULT_PROGRESS_FILE.is_file():
-        if not new_search and first_index is None:
-            first_index = offer_to_skip_indices_ruled_out_by_progress_file(force_resume)
-        else:
-            DEFAULT_PROGRESS_FILE.unlink()
-
-    if first_index is None:
-        first_index = 0
 
     if ns.command is None:
         command = _default_Checker_selector(*extras)
@@ -1389,6 +1412,16 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
             "of any recovered password will be printed. "
         )
 
+    progress_saver = ProgressSaver(
+        **kwargs
+    )  # if ns.estimate else ProgressSaver(**kwargs)
+    # Unavoidable coupling of progress file handling
+    # and default first index calculation.
+    #
+    # Could have try_to_resume return first_index, and
+    # call that here instead?
+    first_index = progress_saver.first_index
+
     total, candidates = ns.password_generator(
         first_index=first_index,
         guesses=password_guesses,
@@ -1403,7 +1436,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
     if ns.verbosity >= 1:
         update_every = min(update_every, 1000)
 
-    updater = Updater(
+    updater = UserUpdatePrinter(
         verbosity=ns.verbosity, total=total, print_passwords=ns.print_passwords
     )
 
@@ -1417,6 +1450,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         total=total,
         update_every=update_every,
         updater=updater,
+        progress_saver=progress_saver,
         **kwargs,
     )
 

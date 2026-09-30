@@ -20,14 +20,13 @@ from hypothesis.strategies import composite, integers, lists
 from fiddlesticks import (
     IS_WINDOWS,
     OpenSSHKeyChecker,
+    ProgressSaver,
     SSHPEMKeyChecker,
     UnknownCPUCount,
     _get_hopefully_incorrect_password,
     cli,
     get_cpu_count,
     handle_found_password,
-    offer_to_skip_indices_ruled_out_by_progress_file,
-    save_ruled_out_indices_to_progress_file,
 )
 
 from .helpers import (
@@ -187,12 +186,12 @@ def test_offer_to_skip_indices_ruled_out_by_progress_file_y(tmp_path, capsys):
     progress_file, indices = _create_random_progress_file(
         tmp_path / "test_progress_file.json"
     )
-
     with patch("builtins.input", side_effect=["y"]):
-        assert indices[0] + 1 == offer_to_skip_indices_ruled_out_by_progress_file(
+        progress_saver = ProgressSaver(
             force_resume=False,
-            saved_progress_file=progress_file,
+            progress_file=progress_file,
         )
+        assert indices[0] + 1 == progress_saver.first_index
     capsys.readouterr()
 
 
@@ -202,22 +201,22 @@ def test_offer_to_skip_indices_ruled_out_by_progress_file_n(tmp_path, capsys):
     )
 
     with patch("builtins.input", side_effect=["n"]):
-        assert 0 == offer_to_skip_indices_ruled_out_by_progress_file(
+        progress_saver = ProgressSaver(
             force_resume=False,
-            saved_progress_file=progress_file,
+            progress_file=progress_file,
         )
+        assert 0 == progress_saver.first_index
     capsys.readouterr()
 
 
 def test_bad_progress_file(tmp_path):
     progress_file = tmp_path / "test_progress_file.json"
     progress_file.write_text("{")  # Invalid JSON
-
-    index = offer_to_skip_indices_ruled_out_by_progress_file(
+    progress_saver = ProgressSaver(
         force_resume=False,
-        saved_progress_file=progress_file,
+        progress_file=progress_file,
     )
-    assert index == 0
+    assert 0 == progress_saver.first_index
 
 
 def test_user_declines_to_skip_indices_ruled_out_by_progress_file(tmp_path, capsys):
@@ -226,11 +225,12 @@ def test_user_declines_to_skip_indices_ruled_out_by_progress_file(tmp_path, caps
     )
 
     with patch("builtins.input", side_effect=["n"]):
-        index = offer_to_skip_indices_ruled_out_by_progress_file(
+        progress_saver = ProgressSaver(
             force_resume=False,
-            saved_progress_file=progress_file,
+            progress_file=progress_file,
         )
-    assert index == 0
+
+    assert 0 == progress_saver.first_index
     capsys.readouterr()
 
 
@@ -255,7 +255,7 @@ def ruled_out_candidates_indices(draw) -> tuple[list[int], int]:
     # https://hypothesis.readthedocs.io/en/latest/reference/api.html#hypothesis.settings.derandomize )
 )
 @given(args=ruled_out_candidates_indices())
-def test_save_ruled_out_indices_to_progress_file(args: tuple[list[int], int]):
+def test_ProgressSaver_first_index_calc(args: tuple[list[int], int]):
     untrimmed_indices, smallest_after_trimming = args
 
     stream = io.StringIO()
@@ -265,14 +265,14 @@ def test_save_ruled_out_indices_to_progress_file(args: tuple[list[int], int]):
     with contextlib.redirect_stderr(stream), tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
         progress_file = tmp_path / "test_progress_file.json"
-        save_ruled_out_indices_to_progress_file(untrimmed_indices, progress_file)
+        progress_saver = ProgressSaver(progress_file=progress_file)
+        progress_saver.update_progress(untrimmed_indices)
         trimmed_indices = json.loads(progress_file.read_text())[
             "ruled_out_candidates_indices"
         ]
 
-        starting_index = offer_to_skip_indices_ruled_out_by_progress_file(
-            True, progress_file
-        )
+        progress_saver.try_to_resume()
+        starting_index = progress_saver.first_index
 
     assert smallest_after_trimming == trimmed_indices[0]
     assert smallest_after_trimming + 1 == starting_index

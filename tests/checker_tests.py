@@ -9,10 +9,11 @@ import pytest
 from fiddlesticks import (
     IS_WINDOWS,
     MS_OfficeFilesKeyChecker,
+    ProgressSaver,
     PyAvduAegisChecker,
     PyKeepassChecker,
     SubprocessChecker,
-    Updater,
+    UserUpdatePrinter,
     VeracryptChecker,
     _make_new_tmp_sub_dir,
     _SSHKeyCheckerBase,
@@ -90,7 +91,8 @@ def test_sequential_passwords_checker_verbosity_2(capsys):
         indexed_candidates=list(enumerate([("A", 0), ("B", 0), ("C", 0)])),
         checker_maker=dummy_checker_maker,
         update_every=1,
-        updater=Updater(verbosity=2, total=3, print_passwords=True),
+        updater=UserUpdatePrinter(verbosity=2, total=3, print_passwords=True),
+        progress_saver=ProgressSaver(new_search=True),
     )
     capsys.readouterr()
     assert result is None
@@ -107,7 +109,8 @@ def test_sequential_passwords_warns_on_multiple_cores(capsys):
             indexed_candidates=[],
             checker_maker=dummy_checker_maker,
             update_every=1,
-            updater=Updater(),
+            updater=UserUpdatePrinter(),
+            progress_saver=ProgressSaver(new_search=True),
             num_cores=2,
         )
     capsys.readouterr()
