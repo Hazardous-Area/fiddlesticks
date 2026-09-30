@@ -799,6 +799,16 @@ class ProgressSaver:
     progress_file: Path = DEFAULT_PROGRESS_FILE
 
     def __post_init__(self, *args, **kwargs):
+        if self.first_index is None:
+            if not self.new_search and self.progress_file.is_file():
+                pass
+                # self.first_index = read first index from file
+            else:
+                self.first_index = 0
+
+
+
+
         if self.progress_file.is_file():
             if not self.new_search and self.first_index is None:
                 self.first_index = self.try_to_resume()
@@ -824,7 +834,7 @@ class ProgressSaver:
         saved_indices.extend(indices)
         saved_indices.sort()
 
-        # Drop any initial sequence of consecutive indices
+        # Drop any initial sequence of consecutive or duplicated indices
         # (we assume all consecutive ones below the lowest saved one
         #  have all been rules out)
         i = 0
