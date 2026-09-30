@@ -242,7 +242,7 @@ def ruled_out_candidates_indices(draw) -> tuple[list[int], int]:
     return [*range(i, j + 1), *extras], j
 
 
-@pytest.mark.skipif(IS_WINDOWS, reason="Crashes_with_memory_error")
+# @pytest.mark.skipif(IS_WINDOWS, reason="Crashes_with_memory_error")
 @pytest.mark.hypothesis
 @pytest.mark.slow
 @settings(
@@ -265,14 +265,14 @@ def test_ProgressSaver_first_index_calc(args: tuple[list[int], int]):
     with contextlib.redirect_stderr(stream), tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
         progress_file = tmp_path / "test_progress_file.json"
-        progress_saver = ProgressSaver(progress_file=progress_file)
-        progress_saver.update_progress(untrimmed_indices)
+        progress_saver_writer = ProgressSaver(progress_file=progress_file, new_search=True)
+        progress_saver_writer.update_progress(untrimmed_indices)
         trimmed_indices = json.loads(progress_file.read_text())[
             "ruled_out_candidates_indices"
         ]
-
-        progress_saver.try_to_resume()
-        starting_index = progress_saver.first_index
+        del progress_saver_writer
+        progress_saver_reader = ProgressSaver(progress_file=progress_file, force_resume=True)
+        starting_index = progress_saver_reader.first_index
 
     assert smallest_after_trimming == trimmed_indices[0]
     assert smallest_after_trimming + 1 == starting_index
