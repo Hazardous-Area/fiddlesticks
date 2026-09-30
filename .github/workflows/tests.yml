@@ -33,6 +33,7 @@ jobs:
     - name: Run PyTest (via Coverage)
       run: |
         . /fiddlesticks/.venv/bin/activate
-        coverage run -m pytest -rA --tb=short tests && coverage combine && coverage report
+        pytest -vvx tests
+        # coverage run -m pytest -rA --tb=short tests && coverage combine && coverage report
 
 

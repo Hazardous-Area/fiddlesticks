@@ -1413,7 +1413,9 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         )
 
     progress_saver = ProgressSaver(
-        **kwargs
+        first_index=ns.first_index,
+        force_resume=ns.force_resume,
+        new_search=ns.new_search,
     )  # if ns.estimate else ProgressSaver(**kwargs)
     # Unavoidable coupling of progress file handling
     # and default first index calculation.
