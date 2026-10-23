@@ -9,12 +9,13 @@ Version 0.6.1
 ## Description
 Password recovery tool, for password-encrypted files, using simple off-line brute 
 force attacks.  Password candidates are generated, using common variations 
-of a guessed password (e.g. typos and substitutions). SSH keys and Aegis archives, 
-plus .7z, .kdbx, .xlsx, and .docx files, 
-are directly supported as optional dependencies (Veracrypt volumes too, but they're 
-so secure, they require 45 CPU-core-seconds per guess).  But 
+of a guessed password (e.g. typos and substitutions). SSH keys, Veracrypt volumes, /etc/shadow lines(\*), and Aegis archives, plus .7z, .kdbx, .xlsx and .docx files and 
+are directly supported as optional dependencies.  But 
 Fiddlesticks can also call any shell command, that accepts a candidate password, 
 e.g. for Veracrypt volumes (and can pipe candidates to stdout).
+
+(\*) If root or sudo is available to read /etc/shadow in the first place, note:
+if the goal is only to access another user's account, their password can simply be changed, also with sudo.
 
 ### Raison d'etre
  - Password-protected file owners recovering their own password themselves, as long as 

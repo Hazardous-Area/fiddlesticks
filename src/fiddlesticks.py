@@ -790,6 +790,54 @@ class VeracryptChecker(SubprocessChecker):
         self.temp_dir.cleanup()
 
 
+class EtcShadowChecker(Checker):
+    @staticmethod
+    def _parse_etc_shadow_line(line: str, name: str) -> tuple[str, str] | None:
+        fields = line.split(":")
+        if len(fields) <= 1:
+            return None
+        account_name, flag_salt_and_digest = fields[:2]
+
+        if name != account_name:
+            return None
+
+        try:
+            __, flag, salt, _digest = flag_salt_and_digest.split("$")
+        except ValueError:
+            return None
+
+        salt_arg = f"${flag}${salt}"
+        return flag_salt_and_digest, salt_arg
+
+    @classmethod
+    def parse_etc_shadow(cls, file: FileT, account_name: str) -> tuple[str, str] | None:
+        file_path = Path(file)
+        for line in file_path.read_text().splitlines():
+            parsed = cls._parse_etc_shadow_line(line, account_name)
+            if parsed is not None:
+                return parsed
+        return None
+
+    def __init__(self, file: FileT, account_name: str, **kwargs):
+        import legacycrypt
+
+        self.crypt = legacycrypt
+        parsed = self.parse_etc_shadow(file, account_name)
+        if parsed is None:
+            raise ValueError(
+                f"Could not parse: {file} as /etc/shadow for account name: {account_name}"
+            )
+        self.shadow_hash_line, self.salt_arg = parsed
+
+    def __call__(self, candidate: str):
+        # Fiddlesticks doesn't care about timing attacks
+        # (its primary purpose is to enable the password owner's own attack!).
+        #
+        # But in general, don't directly compare strings for log-in purposes,
+        # (or any application in which the attacker can gain timing information).
+        return self.crypt.crypt(candidate, salt=self.salt_arg) == self.shadow_hash_line
+
+
 def save_ruled_out_indices_to_progress_file(
     indices: list[int],
     saved_progress_file: Path = DEFAULT_PROGRESS_FILE,
@@ -1055,7 +1103,7 @@ def check_passwords_in_parallel(
         return None
 
 
-default_Checkers = {
+default_file_checkers = {
     ".7z": SevenZipChecker,
     ".json": PyAvduAegisChecker,
     ".kdbx": PyKeepassChecker,
@@ -1076,10 +1124,24 @@ def _default_Checker_selector(*args: str):
             "Default checker requires arg(s) to define how to test the passwords"
         )
 
-    path = Path(args[0])
+    file_path: Path | None
+    for arg in args:
+        file_path = Path(arg)
+        if file_path.is_file():
+            break
+    else:
+        file_path = None
 
-    if len(args) == 1 and path.is_file():
-        return default_Checkers[path.suffix.lower()]
+    if len(args) == 1 and file_path is not None:
+        return default_file_checkers[file_path.suffix.lower()]
+
+    if len(args) == 2 and file_path is not None:
+        account_name = next((arg for arg in args if not Path(arg).is_file()), None)
+        if (
+            account_name is not None
+            and EtcShadowChecker.parse_etc_shadow(file_path, account_name) is not None
+        ):
+            return EtcShadowChecker
 
     return SubprocessChecker
 
@@ -1198,6 +1260,7 @@ parser.add_argument(
     help=(
         "Extra args to create the password checker with. "
         "E.g. file to find password for, "
+        "line from /etc/shadow"
         "or partial shell command, "
         "to which the password guesses will be appended, "
         "such as: 7z x archive.7z -p"
@@ -1264,6 +1327,7 @@ add_command_arg("--aegis", PyAvduAegisChecker)
 add_command_arg("--py7zr", Py7zrChecker)
 add_command_arg("--msoffice", MS_OfficeFilesKeyChecker)
 add_command_arg("--veracrypt", VeracryptChecker)
+add_command_arg("--etc-shadow-line", EtcShadowChecker)
 
 
 alt_char_map_group = add_mutex_group(
@@ -1383,7 +1447,7 @@ def cli(args: list[str] = sys.argv[1:]) -> int:
         and ns.verbosity == 0
     ):
         warnings.warn(
-            "The SSH key, Keepass and the Aegis vault checkers do not decrypt files. "
+            "The SSH key, Keepass, /etc/shadow, and the Aegis vault checkers do not decrypt files. "
             "When running fiddlesticks without print-passwords, without "
             "an output-file, and with verbosity=0, only the candidate index "
             "of any recovered password will be printed. "

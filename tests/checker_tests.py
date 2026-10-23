@@ -8,6 +8,7 @@ import pytest
 
 from fiddlesticks import (
     IS_WINDOWS,
+    EtcShadowChecker,
     MS_OfficeFilesKeyChecker,
     PyAvduAegisChecker,
     PyKeepassChecker,
@@ -22,6 +23,7 @@ from fiddlesticks import (
 
 from .helpers import (
     DOCX_FILE,
+    ETC_SHADOW,
     KDBX_TEST_VAULT,
     SEVEN_ZIP_TEST_ARCHIVE,
     XLSX_FILE,
@@ -204,3 +206,53 @@ def test_SSH_base_class_cannot_be_instantiated():
     ):
         with pytest.raises(TypeError):
             Class(file="some_key_file.pem")
+
+
+def test_EtcShadowChecker(tmp_path):
+    with EtcShadowChecker(ETC_SHADOW, "testymctestface") as checker:
+        assert not checker("incorrect_horse")
+        assert checker("correcthorse")
+
+    invalid_shadow_file = tmp_path / "invalid_etc_shadow.txt"
+    invalid_shadow_file.write_text("foo:\nbar:\n")
+    assert EtcShadowChecker.parse_etc_shadow(invalid_shadow_file, "baz") is None
+
+    with pytest.raises(ValueError):
+        EtcShadowChecker(invalid_shadow_file, "baz")
+
+
+def test_parse_etc_shadow_line():
+    valid_line = "foo:$6$salt$hash:0:0:0:0:::"
+    assert EtcShadowChecker._parse_etc_shadow_line(valid_line, "foo") == (
+        valid_line.split(":")[1],
+        "$6$salt",
+    )
+    # Line only contains no colons (":"s)
+    assert (
+        EtcShadowChecker._parse_etc_shadow_line(valid_line.replace(":", ";"), "foo")
+        is None
+    )
+    # Name not found
+    assert EtcShadowChecker._parse_etc_shadow_line(valid_line, "bar") is None
+    # Leading $ missing
+    assert (
+        EtcShadowChecker._parse_etc_shadow_line(
+            valid_line.replace("$", "", count=1), "foo"
+        )
+        is None
+    )
+    # Flag missing
+    assert (
+        EtcShadowChecker._parse_etc_shadow_line(valid_line.replace("$6", ""), "foo")
+        is None
+    )
+    # Salt missing
+    assert (
+        EtcShadowChecker._parse_etc_shadow_line(valid_line.replace("$salt", ""), "foo")
+        is None
+    )
+    # Hash missing
+    assert (
+        EtcShadowChecker._parse_etc_shadow_line(valid_line.replace("$hash", ""), "foo")
+        is None
+    )

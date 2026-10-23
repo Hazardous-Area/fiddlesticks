@@ -43,8 +43,11 @@ py7zr = [
 msoffice = [
     "msoffcrypto-tool",
 ]
+etc_shadow = [
+    "legacycrypt",
+]
 all = [
-    "fiddlesticks[ssh,keepassxc,aegis,py7zr,msoffice]",
+    "fiddlesticks[ssh,keepassxc,aegis,py7zr,msoffice,etc_shadow]",
 ]
 # Note.  Some features also require optional dependencies 
 # that are not available on PyPi (and must be installed from

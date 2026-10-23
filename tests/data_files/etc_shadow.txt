@@ -1,0 +1,2 @@
+username:$flag$salt$hash:last:logged:in:times:etc::
+testymctestface:$6$ToieP6Pt$BMSA.nEPerJ61R7iKPWApFPQ4DI1FYZlAHNOlAcsCoRVaIb1Kc8MN1N1WL5QiQOP2IJ0X5pfDbXU2BdUJtc5U0:20749:0:99999:7:::
