@@ -17,6 +17,7 @@ from fiddlesticks import IS_WINDOWS
 from .helpers import (
     BI_MAP,
     DOCX_FILE,
+    ETC_SHADOW,
     KDBX_TEST_VAULT,
     SEVEN_ZIP_TEST_ARCHIVE,
     XLSX_FILE,
@@ -262,6 +263,21 @@ def test_bad_guess_with_all_cores_with_docx():
         check=False,
     )
     assert result.returncode == 1
+
+
+def test_etc_shadow_checker_from_CLI_via_default():
+    result = subprocess.run(
+        _collate_args(
+            4,
+            ["c0rr3cthorse"],
+            ETC_SHADOW.as_posix(),
+            "testymctestface",
+            "--num-cores=1",
+        ),
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0
 
 
 @pytest.mark.parametrize(

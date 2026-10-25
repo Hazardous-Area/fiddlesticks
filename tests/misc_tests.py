@@ -19,9 +19,11 @@ from hypothesis.strategies import composite, integers, lists
 
 from fiddlesticks import (
     IS_WINDOWS,
+    EtcShadowChecker,
     OpenSSHKeyChecker,
     SSHPEMKeyChecker,
     UnknownCPUCount,
+    _default_Checker_selector,
     _get_hopefully_incorrect_password,
     cli,
     get_cpu_count,
@@ -32,6 +34,7 @@ from fiddlesticks import (
 
 from .helpers import (
     DOCX_FILE,
+    ETC_SHADOW,
     SEVEN_ZIP_TEST_ARCHIVE,
     XLSX_FILE,
     _assert_output_on_found_password,
@@ -302,3 +305,29 @@ def test_multiple_cores_to_let_coverage_measure_lines_properly(capsys):
     )
     assert 0 == retcode
     capsys.readouterr()
+
+
+def test_default_Checker_selector_two_files_EtcShadowChecker_not_Selected(tmp_path):
+    other_file = tmp_path / "foo.txt"
+    other_file.write_text("bar")
+
+    invalid_shadow_file = tmp_path / "invalid_etc_shadow.txt"
+    invalid_shadow_file.write_text("foo:\nbar:\n")
+
+    assert (
+        _default_Checker_selector(ETC_SHADOW.as_posix(), "testymctestface")
+        is EtcShadowChecker
+    )
+    assert (
+        _default_Checker_selector(ETC_SHADOW.as_posix(), "wrong_user")
+        is not EtcShadowChecker
+    )
+    assert EtcShadowChecker.parse_etc_shadow(ETC_SHADOW, other_file.as_posix()) is None
+    assert (
+        _default_Checker_selector(ETC_SHADOW.as_posix(), other_file.as_posix())
+        is not EtcShadowChecker
+    )
+    assert (
+        _default_Checker_selector(invalid_shadow_file.as_posix(), ETC_SHADOW.as_posix())
+        is not EtcShadowChecker
+    )
